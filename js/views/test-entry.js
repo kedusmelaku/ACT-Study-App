@@ -105,6 +105,14 @@ function questionCount(section) {
   return SECTIONS[section].questions;
 }
 
+/** A shorter test (enhanced vs legacy) can't keep marks past its last question. */
+function pruneMarks() {
+  for (const s of ALL_SECTIONS) {
+    const n = questionCount(s);
+    for (const q of Object.keys(draft.marks[s])) if (Number(q) > n) delete draft.marks[s][q];
+  }
+}
+
 function scoreValue(s) {
   const v = Number(draft.scores[s]);
   return Number.isInteger(v) && v >= MIN_SCORE && v <= (draft.scale === 35 ? 35 : MAX_SCORE) ? v : null;
@@ -162,6 +170,7 @@ export function render(el, ctx) {
       if (draft.kind === 'benchmark') draft.scale = 35;
       else if (draft.scale === 35) draft.scale = 36;
       if (draft.kind === 'real') draft.sourceId = '';
+      pruneMarks();
       draw();
       return;
     }
@@ -239,6 +248,7 @@ export function render(el, ctx) {
     if (t.name === 'sourceId') {
       draft.sourceId = t.value;
       if (draft.kind !== 'real' && draft.kind !== 'benchmark') draft.kind = kindForSource(t.value);
+      pruneMarks();
       draw();
     } else if (t.name === 'scale') {
       draft.scale = Number(t.value);

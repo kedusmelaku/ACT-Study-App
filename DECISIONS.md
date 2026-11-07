@@ -96,3 +96,20 @@ Judgment calls made without asking. One line each: what, then why.
 - The day a task moved off keeps that time blocked, so the planner doesn't refill a night you just cleared.
 - Quick picks list the next study days that fit the task first, then ones that nearly fit, and say plainly when a day will run long; any date can still be picked.
 - Rescheduling has Undo, which restores the original task and the old full-test day.
+
+## Bug sweep
+- A full test moved off a day and later moved back is rebuilt there; a "moved" record no longer blocks the day.
+- Heavy-night copies are pinned like rescheduled tasks, so a later plan rebuild (logging a miss, for example) no longer quietly replaces them.
+- Redo tasks can't be rescheduled, since redos stay due until answered and the plan adds them daily; moving one only duplicated it.
+- A pending or done "log the test" task stops the planner from adding a second one.
+- A full-test day that passed with no task at all (for example, the app was set up after that day) shows a reminder on Plan to add a new full-test day.
+- Reschedule suggestions include days with no study time set (useful for a Sunday full test), labeled "Normally a day off".
+- A future week that only holds rescheduled tasks still shows the full preview around them.
+- Taper wording says "in the next two days" instead of "this weekend", because the April school-day ACT may be on a weekday.
+- Switching a test's source to one with fewer questions drops marks past the last question.
+- Identical benchmark entries (one saved per device before sync) count once in estimates and the trend chart.
+- A device's first sync takes settings already on the server, so a freshly set-up device can't replace real test dates and study times with defaults.
+- Import Merge now keeps the more recently edited version of each item instead of always taking the backup's; Import Replace warns that with sync on it also removes items from other devices.
+- Edit stamps only move forward on each device, even if its clock is set back, so edits can't be stamped older than the last sync and skipped.
+- Open tabs tell each other when data changes and reload, so a stale tab can't overwrite newer data.
+- A test checks that every app file is in the service worker's offline list.

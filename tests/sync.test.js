@@ -149,3 +149,10 @@ test('pull pages in batches', { skip: noRedis }, async () => {
     srv.stop();
   }
 });
+
+test('first sync: settings already on the server win over a fresh device', () => {
+  const all = { settings: [{ id: 'settings', availability: { 1: 30 }, _fieldTimes: { availability: T3 } }] };
+  const recs = [{ store: 'settings', key: 'availability', updatedAt: T1, value: { key: 'availability', value: { 1: 45 } } }];
+  assert.deepEqual(incomingWrites(all, recs).settingsPatch, {});
+  assert.deepEqual(incomingWrites(all, recs, { forceSettings: new Set(['availability']) }).settingsPatch, { availability: { 1: 45 } });
+});

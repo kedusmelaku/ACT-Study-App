@@ -69,3 +69,12 @@ test('estimated composite uses the rounding rule', () => {
   const e = estimates([attempt('b', '2026-11-01', 'benchmark', { english: 35, math: 35, reading: 33 }, 35)]);
   assert.equal(estimatedComposite(e), 34);
 });
+
+test('a duplicated benchmark (one per device) counts once', () => {
+  const b1 = { ...attempt('b1', '2026-11-07', 'benchmark', { english: 35, math: 35, reading: 33 }, 35), createdAt: '2026-11-07T10:00:00Z' };
+  const b2 = { ...attempt('b2', '2026-11-14', 'benchmark', { english: 35, math: 35, reading: 33 }, 35), createdAt: '2026-11-14T10:00:00Z' };
+  const p = attempt('p', '2026-11-10', 'official_enhanced', { english: 30, math: 30, reading: 30 });
+  const e = estimates([b1, b2, p]);
+  assert.equal(e.english.count, 2);
+  assert.deepEqual(e.english.attemptIds, ['p', 'b1']);
+});

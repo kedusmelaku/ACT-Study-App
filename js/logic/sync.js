@@ -72,9 +72,11 @@ export function outgoingChanges(all, since = '') {
 
 /**
  * Decide what to write locally from pulled records.
+ * forceSettings: a Set of settings fields to take from the server whatever their edit time
+ * (used on a device's first sync, so a freshly set-up device doesn't overwrite real settings).
  * Returns { puts: [{ store, value }], settingsPatch: { field: value }, fieldTimes: { field: time } }.
  */
-export function incomingWrites(all, records) {
+export function incomingWrites(all, records, { forceSettings = null } = {}) {
   const index = {};
   for (const store of SYNC_STORES) {
     const kp = KEY_PATHS[store];
@@ -96,7 +98,8 @@ export function incomingWrites(all, records) {
   for (const rec of best.values()) {
     if (rec.store === 'settings') {
       if (!isSyncedSetting(rec.key) || !rec.value) continue;
-      if (String(rec.updatedAt) > String(times[rec.key] || '')) {
+      const forced = forceSettings && forceSettings.has(rec.key);
+      if (forced || String(rec.updatedAt) > String(times[rec.key] || '')) {
         settingsPatch[rec.key] = rec.value.value;
         fieldTimes[rec.key] = String(rec.updatedAt);
       }

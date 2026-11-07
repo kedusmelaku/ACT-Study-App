@@ -24,7 +24,8 @@ export function render(el, ctx) {
   const isFuture = compareDates(ws, current) > 0;
   let tasks = s.tasks.filter((t) => t.weekStart === ws);
   let preview = false;
-  if (isFuture && !tasks.length) {
+  // A future week with only rescheduled (pinned) tasks still gets a preview of the rest, around them.
+  if (isFuture && !tasks.some((t) => !t.pinned)) {
     preview = true;
     tasks = generateWeek({
       weekStart: ws,
@@ -35,7 +36,7 @@ export function render(el, ctx) {
       materials: store.materials(),
       materialUse: s.materialUse,
       attempts: s.attempts,
-      existingTasks: [],
+      existingTasks: tasks,
     }).tasks;
   }
   const dates = weekDates(ws);
@@ -70,6 +71,6 @@ function dayBlock(date, list, isToday, settings, preview) {
   const label = PHASE_NOTE[phase.kind] || (heavy ? 'Heavy night.' : busy ? 'Busy day.' : cap ? `${fmtMinutes(cap)} available` : 'Rest day');
   return html`<section class="day">
     <div class="day-head ${isToday ? 'is-today' : ''}"><h3>${isToday ? 'Today, ' : ''}${weekdayName(date)} ${formatDate(date, { weekday: false })}</h3><span class="small muted">${label}</span></div>
-    ${list.length ? list.map((t) => taskCard(t, { collapsed: true, showActions: !preview })) : html`<div class="day-empty">${phase.kind === 'logistics' ? 'Admission ticket, photo ID, calculator, sleep.' : 'No tasks.'}</div>`}
+    ${list.length ? list.map((t) => taskCard(t, { collapsed: true, showActions: !preview || !!t.pinned })) : html`<div class="day-empty">${phase.kind === 'logistics' ? 'Admission ticket, photo ID, calculator, sleep.' : 'No tasks.'}</div>`}
   </section>`;
 }

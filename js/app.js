@@ -167,6 +167,11 @@ async function boot() {
   }
   store.subscribe(rerender);
   startSync();
+  let reloadTimer = null;
+  store.db.onOtherTabWrite(() => {
+    clearTimeout(reloadTimer);
+    reloadTimer = setTimeout(() => store.refreshFromDisk().catch((e) => console.error(e)), 150);
+  });
   window.addEventListener('hashchange', route);
   window.addEventListener('online', rerender);
   window.addEventListener('offline', rerender);

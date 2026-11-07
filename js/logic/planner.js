@@ -1,7 +1,7 @@
 // Weekly plan generation and rescheduling. Pure and deterministic:
 // the same inputs always produce the same plan.
 import { SECTIONS, CORE_SECTIONS, ALL_SECTIONS, LEGACY_SECTIONS, ENHANCED_PARTS, FULL_TEST_BREAK_MINUTES, FOCUS, REDO, minutesAtPace } from '../data/act.js';
-import { weekDates, compareDates } from './dates.js';
+import { weekDates, compareDates, daysBetween, formatDate } from './dates.js';
 import { dayPhase, dayCapacity, isNoStudyDay, weekStartFor, fullTestOn } from './phase.js';
 import { dueByDate } from './redo.js';
 
@@ -455,7 +455,8 @@ export function generateWeek({ weekStart, today, settings, focus, redos = [], ma
   for (const d of dates) {
     const phase = dayPhase(d, settings);
     if (phase.kind !== 'fulltest') continue;
-    const keptFull = kept.find((t) => t.date === d && t.type === 'full_test');
+    // A full test that was moved off this day doesn't count; a test moved back here gets rebuilt.
+    const keptFull = kept.find((t) => t.date === d && t.type === 'full_test' && t.status !== 'moved');
     if (keptFull) {
       fullTestDays.add(d);
       // A skipped full test has nothing to log, and its test stays unused for a later full-test day.
@@ -484,6 +485,22 @@ export function generateWeek({ weekStart, today, settings, focus, redos = [], ma
     }, PRIORITY.full_test);
     remaining[d] = 0;
     logTaskFor.push({ date: d, sourceId: src.sourceId, title: src.title });
+  }
+
+  // A log task that's still pending (rescheduled, or today or later) or already done means no new one.
+  for (const l of logTaskFor) {
+    if (kept.some((t) => t.type === 'log_test' && t.logSourceId === l.sourceId && (t.status === 'done' || (t.status === 'todo' && (t.pinned || compareDates(t.date, today) >= 0))))) {
+      l.placed = true;
+    }
+  }
+
+  // A full-test day that passed with no task at all (for example, set up after that day) gets a reminder.
+  for (const f of settings.fullTests || []) {
+    if (!f || compareDates(f.date, today) >= 0 || daysBetween(f.date, today) > 21) continue;
+    if (f.sourceId && usedSources.has(f.sourceId)) continue;
+    if (existingTasks.some((t) => t.type === 'full_test' && (t.date === f.date || (t.materialRef && t.materialRef.sourceId === f.sourceId && t.status !== 'skipped')))) continue;
+    const m = materials.find((x) => x.sourceId === f.sourceId);
+    notes.push(`${m ? m.title : 'A full test'} was planned for ${formatDate(f.date)} and never scheduled. To take it, add a full-test day in Settings.`);
   }
 
   // 2. Day structures for the remaining future days.
@@ -732,6 +749,8 @@ export function heavyNight({ tasks, today, settings, weekStart }) {
       slot: nextSlot,
       status: 'todo',
       origin: 'moved',
+      // Pinned so a later plan rebuild keeps it instead of quietly replacing it.
+      pinned: true,
       movedFrom: today,
     };
     delete copy.dropped;

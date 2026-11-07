@@ -58,12 +58,30 @@ export function superscore(attempts = []) {
 }
 
 /**
+ * Drop repeated benchmark entries with identical scores (for example, saved once on each device
+ * before sync was turned on). The earliest one is kept.
+ */
+export function dedupeAttempts(attempts = []) {
+  const seen = new Set();
+  return attempts
+    .slice()
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')))
+    .filter((a) => {
+      if (!a || a.kind !== 'benchmark') return true;
+      const key = JSON.stringify(a.scores || {});
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+/**
  * Current estimate per section: weighted average of the 3 most recent attempts with that section.
  * Weights: recency (1.0, 0.7, 0.5) times kind weight. 35-scale scores stay as-is but are flagged capped.
  * Returns { english: { value, score, capped, count, attemptIds } | null, ... }
  */
 export function estimates(attempts = []) {
-  const sorted = attempts.filter((a) => a && a.scores).slice().sort(byDateDesc);
+  const sorted = dedupeAttempts(attempts).filter((a) => a && a.scores).sort(byDateDesc);
   const out = {};
   for (const s of ALL_SECTIONS) {
     const used = [];

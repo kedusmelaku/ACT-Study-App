@@ -70,27 +70,42 @@ async function run() {
     await store.saveSyncState({ lastError: MESSAGES.offline });
     return { skipped: true };
   }
-  const startedAt = new Date().toISOString();
+  const startedAt = db.stampNow();
   const state = syncState();
   try {
+    let since = Number(state.lastPullSeq) || 0;
+    const records = [];
+    const pullAll = async () => {
+      for (let page = 0; page < 50; page++) {
+        const r = await post({ since, changes: [] });
+        records.push(...(r.records || []));
+        since = r.seq;
+        if (!r.more) break;
+      }
+    };
+    // First sync on this device: look at the server first. Settings already there win, so a freshly
+    // set-up device doesn't replace real test dates and study times with defaults.
+    const first = !state.lastSyncAt;
+    let serverSettings = null;
+    if (first) {
+      await pullAll();
+      serverSettings = new Set(records.filter((r) => r.store === 'settings').map((r) => r.key));
+    }
     // Push everything this device wrote since the last successful push.
     const raw = await db.loadAll();
-    const changes = outgoingChanges(raw, state.lastPushAt || '');
+    const changes = outgoingChanges(raw, state.lastPushAt || '').filter((c) => !(serverSettings && c.store === 'settings' && serverSettings.has(c.key)));
     let pushed = 0;
     for (const chunk of batches(changes)) {
       const r = await post({ changes: chunk, pull: false });
       pushed += r.accepted || 0;
     }
     // Pull everything other devices changed since the last pull, page by page.
-    let since = Number(state.lastPullSeq) || 0;
-    const records = [];
-    for (let page = 0; page < 50; page++) {
-      const r = await post({ since, changes: [] });
-      records.push(...(r.records || []));
-      since = r.seq;
-      if (!r.more) break;
-    }
-    const result = await store.applySync(records, { lastPushAt: startedAt, lastPullSeq: since, lastSyncAt: new Date().toISOString(), lastError: null });
+    await pullAll();
+    const result = await store.applySync(
+      records,
+      { lastPushAt: startedAt, lastPullSeq: since, lastSyncAt: new Date().toISOString(), lastError: null },
+      { forceSettings: serverSettings },
+    );
     return { pushed: changes.length, accepted: pushed, pulled: records.length, applied: result.applied };
   } catch (e) {
     console.error('Sync failed', e);

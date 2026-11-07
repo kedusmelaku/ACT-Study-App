@@ -111,7 +111,7 @@ function loadState(all) {
  * so sync can merge settings field by field.
  */
 function nextSettings(patch) {
-  const now = new Date().toISOString();
+  const now = db.stampNow();
   const times = { ...(state.settings._fieldTimes || {}) };
   for (const [k, v] of Object.entries(patch)) {
     if (isSyncedSetting(k) && JSON.stringify(state.settings[k]) !== JSON.stringify(v)) times[k] = now;
@@ -125,7 +125,7 @@ function nextSettings(patch) {
  * over a brand-new device's defaults.
  */
 async function upgradeForSync(all) {
-  const now = new Date().toISOString();
+  const now = db.stampNow();
   const ops = [];
   for (const [name, rows] of Object.entries(all)) {
     if (name === 'settings') continue;
@@ -564,9 +564,9 @@ export async function importBackup(obj, mode) {
 // ---------------------------------------------------------------- sync
 
 /** Write records pulled from sync (only the ones edited later than what's here), then refresh. */
-export async function applySync(records, syncPatch) {
+export async function applySync(records, syncPatch, { forceSettings = null } = {}) {
   const raw = await db.loadAll();
-  const { puts, settingsPatch, fieldTimes } = incomingWrites(raw, records);
+  const { puts, settingsPatch, fieldTimes } = incomingWrites(raw, records, { forceSettings });
   const ops = puts.map((p) => ({ store: p.store, type: 'put', value: p.value, fromSync: true }));
   const rawSettings = raw.settings.find((s) => s.id === 'settings') || state.settings;
   const settings = withDefaults({
@@ -582,6 +582,12 @@ export async function applySync(records, syncPatch) {
   if (changed && state.settings.onboarded) await regenerate();
   emit();
   return { applied: puts.length + Object.keys(settingsPatch).length };
+}
+
+/** Reload everything from IndexedDB (another tab changed it) and refresh the screen. */
+export async function refreshFromDisk() {
+  await reloadFromDB();
+  emit();
 }
 
 /** Save device-only sync state (enabled, cursors, last error) without marking anything for upload. */

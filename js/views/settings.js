@@ -448,7 +448,8 @@ async function doImport(file) {
       <button class="btn btn-danger" data-close="replace">Replace everything on this device</button>
       <button class="btn btn-secondary" data-close="">Cancel</button>
     </div>
-    <p class="hint">Merge keeps your current data and adds the backup. Items with the same ID take the backup's version.</p>`);
+    <p class="hint">Merge keeps your current data and adds what's missing. If an item is in both, the more recently edited version wins.</p>
+    ${store.state.settings.sync && store.state.settings.sync.enabled ? html`<p class="hint strong">Sync is on, so Replace also removes these items from your other devices.</p>` : ''}`);
   if (mode !== 'merge' && mode !== 'replace') return;
   try {
     await store.importBackup(obj, mode);

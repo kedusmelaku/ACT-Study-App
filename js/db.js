@@ -97,6 +97,40 @@ export async function del(store, key) {
   await batch([{ store, type: 'delete', key }]);
 }
 
+// Edit stamps only move forward on this device, even if the clock is set back,
+// so nothing written after a sync can look older than that sync and get skipped.
+const STAMP_KEY = 'act-prep-last-stamp';
+let lastStamp = '';
+export function stampNow() {
+  try {
+    const saved = localStorage.getItem(STAMP_KEY) || '';
+    if (saved > lastStamp) lastStamp = saved;
+  } catch {
+    /* storage may be unavailable; the in-memory stamp still works for this session */
+  }
+  let now = new Date().toISOString();
+  if (now <= lastStamp) now = new Date(Date.parse(lastStamp) + 1).toISOString();
+  lastStamp = now;
+  try {
+    localStorage.setItem(STAMP_KEY, now);
+  } catch {
+    /* see above */
+  }
+  return now;
+}
+
+// Other open tabs of the app reload when this one writes, so a stale tab can't overwrite newer data.
+let channel = null;
+try {
+  // Only in the browser: Node (tests) has BroadcastChannel too, and an open one keeps the process alive.
+  channel = typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('act-prep-db') : null;
+} catch {
+  channel = null;
+}
+export function onOtherTabWrite(fn) {
+  if (channel) channel.addEventListener('message', () => fn());
+}
+
 const localWriteListeners = new Set();
 /** Called after any write made on this device (not writes that came from sync). */
 export function onLocalWrite(fn) {
@@ -113,7 +147,7 @@ export function onLocalWrite(fn) {
 export async function batch(ops) {
   if (!ops.length) return;
   const db = await openDB();
-  const now = new Date().toISOString();
+  const now = stampNow();
   const names = [...new Set(ops.map((o) => o.store))];
   const tx = db.transaction(names, 'readwrite');
   let local = false;
@@ -132,6 +166,7 @@ export async function batch(ops) {
     else if (op.type === 'delete') os.put({ ...tombstone(op.store, op.key, now), _localAt: now });
   }
   await done(tx);
+  if (channel) channel.postMessage('changed');
   if (local) for (const fn of localWriteListeners) fn();
 }
 
@@ -212,7 +247,8 @@ export async function importData(obj, mode) {
   if (!check.ok) throw new Error('Invalid backup');
   const ops = [];
   const currentSettings = await get('settings', 'settings');
-  const existing = mode === 'replace' ? await loadAll() : null;
+  const existing = await loadAll();
+  const stamp = stampNow();
   for (const name of STORE_NAMES) {
     if (mode === 'replace' && name !== 'settings') {
       // Replacing deletes what isn't in the backup (as tombstones, so other devices follow).
@@ -225,10 +261,8 @@ export async function importData(obj, mode) {
     for (const row of obj.data[name] || []) {
       let value = row;
       if (name === 'settings') {
-        // Keep the passcode that is already on this device.
         // Keep this device's passcode and sync state; mark every synced field as just edited so it spreads.
         const times = {};
-        const stamp = new Date().toISOString();
         for (const f of Object.keys(row)) times[f] = stamp;
         value = {
           ...row,
@@ -238,8 +272,18 @@ export async function importData(obj, mode) {
           _fieldTimes: { ...((currentSettings && currentSettings._fieldTimes) || {}), ...times },
         };
       }
+      if (mode === 'merge' && name !== 'settings') {
+        // Merge: the newer version of each item wins, so an old backup can't overwrite newer edits.
+        const kp = STORES[name].keyPath;
+        const local = existing[name].find((r) => String(r[kp]) === String(row[kp]));
+        if (local && String(local.updatedAt || '') >= String(row.updatedAt || '')) continue;
+        ops.push({ store: name, type: 'put', raw: true, value: { ...row, updatedAt: row.updatedAt || stamp, _localAt: stamp } });
+        continue;
+      }
       ops.push({ store: name, type: 'put', value });
     }
   }
   await batch(ops);
+  // Raw writes skip the usual change signal, so send it here for sync.
+  if (ops.length) for (const fn of localWriteListeners) fn();
 }

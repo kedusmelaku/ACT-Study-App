@@ -146,7 +146,7 @@ export function render(el) {
           ${todo.length ? html`<span class="small muted">${fmtMinutes(todo.reduce((a, t) => a + (t.minutes || 0), 0))}</span>` : ''}
         </div>
         ${phase.kind === 'review' ? notice('info', 'Taper week: error log and redo review only. No new practice.') : ''}
-        ${phase.kind === 'taper-weekend' ? notice('info', 'Taper starts now. One final timed set this weekend, then review only.') : ''}
+        ${phase.kind === 'taper-weekend' ? notice('info', 'Taper starts now. One final timed set in the next two days, then review only.') : ''}
         ${tonight.length ? tonight.map((t) => taskCard(t)) : emptyTonight(heavy, upcoming)}
         ${todo.length && !hasFixed
           ? html`<button class="btn btn-secondary btn-block" data-action="heavy">${icon('moon')}Heavy night, move tonight's work</button>`

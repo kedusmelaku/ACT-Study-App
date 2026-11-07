@@ -42,6 +42,8 @@ export function taskCard(t, { showActions = true, collapsed = false } = {}) {
   const cause = t.cause && CAUSES[t.cause] ? html`<span class="badge">${CAUSES[t.cause].short}</span>` : '';
   // Plan shows a quick checkbox; Today shows Done and Skip buttons and a checkbox once done.
   const canAct = showActions && (collapsed ? t.status === 'todo' || t.status === 'done' : done);
+  // Redos stay due until answered, and the plan adds them every day, so moving one would only duplicate it.
+  const movable = t.type !== 'redo';
   return html`<article class="task ${secClass(t.section)} is-${t.status}" data-task="${t.id}">
     ${canAct
       ? html`<button class="check" data-action="toggle-done" data-id="${t.id}" aria-pressed="${done ? 'true' : 'false'}" aria-label="${done ? 'Mark not done' : 'Mark done'}">${icon('check')}</button>`
@@ -63,12 +65,12 @@ export function taskCard(t, { showActions = true, collapsed = false } = {}) {
             <button class="btn btn-sm" data-action="done" data-id="${t.id}">${icon('check')}Done</button>
             <button class="btn btn-sm btn-secondary" data-action="skip" data-id="${t.id}">Skip</button>
           </div>
-          <button class="btn btn-ghost btn-sm reschedule-btn" data-action="reschedule" data-id="${t.id}">${icon('plan')}Reschedule</button>`
+          ${movable ? html`<button class="btn btn-ghost btn-sm reschedule-btn" data-action="reschedule" data-id="${t.id}">${icon('plan')}Reschedule</button>` : ''}`
         : ''}
-      ${showActions && t.status === 'skipped' && !t.dropped
+      ${showActions && movable && t.status === 'skipped' && !t.dropped
         ? html`<button class="btn btn-ghost btn-sm reschedule-btn" data-action="reschedule" data-id="${t.id}">${icon('plan')}Reschedule</button>`
         : ''}
-      ${showActions && collapsed && t.status === 'todo'
+      ${showActions && movable && collapsed && t.status === 'todo'
         ? html`<div class="task-more-actions" hidden><button class="btn btn-ghost btn-sm reschedule-btn" data-action="reschedule" data-id="${t.id}">${icon('plan')}Reschedule</button></div>`
         : ''}
       ${collapsed ? html`<button class="btn btn-ghost btn-sm expand-btn" data-action="expand" data-id="${t.id}" aria-expanded="false">Details</button>` : ''}
@@ -123,10 +125,10 @@ async function openReschedule(id) {
   const candidates = [];
   for (let i = 0; i <= 21; i++) {
     const d = addDays(today, i);
-    if (rescheduleProblem(task, d, today, s) || dayCapacity(d, s) === 0) continue;
+    if (rescheduleProblem(task, d, today, s)) continue;
     const free = freeMinutes(d, store.state.tasks, s);
     const ratio = task.minutes ? free / task.minutes : 1;
-    candidates.push({ date: d, free, group: ratio >= 1 ? 0 : ratio >= 0.75 ? 1 : 2, i });
+    candidates.push({ date: d, free, cap: dayCapacity(d, s), group: ratio >= 1 ? 0 : ratio >= 0.75 ? 1 : 2, i });
   }
   const picks = candidates.sort((a, b) => a.group - b.group || a.i - b.i).slice(0, 5);
   const chosen = await openSheet(
@@ -136,7 +138,7 @@ async function openReschedule(id) {
         ? html`<div class="list">${picks.map(
             (p) => html`<button class="list-item" data-close="${p.date}">
               <div class="grow"><div class="strong">${p.date === today ? 'Today' : formatDate(p.date)}</div>
-                <div class="small muted">${p.free >= task.minutes ? `${fmtMinutes(p.free)} free` : p.free ? `Only ${fmtMinutes(p.free)} free, it will run long` : 'Already full, it will run long'}</div></div>
+                <div class="small muted">${p.free >= task.minutes ? `${fmtMinutes(p.free)} free` : p.free ? `Only ${fmtMinutes(p.free)} free, it will run long` : p.cap ? 'Already full, it will run long' : 'Normally a day off'}</div></div>
               ${icon('chev', 'chev')}</button>`,
           )}</div>`
         : html`<p class="small muted">No study days in the next three weeks. Pick a date below.</p>`}

@@ -1,6 +1,6 @@
 // Progress data: trend series, topic trends, and the aggregated stats sent to the weekly coach. Pure.
 import { ALL_SECTIONS, CORE_SECTIONS, CAUSE_KEYS, CAUSES, FOCUS } from '../data/act.js';
-import { estimates, estimatedComposite, compositeOf } from './scoring.js';
+import { estimates, estimatedComposite, compositeOf, dedupeAttempts } from './scoring.js';
 import { computeFocus, missDate } from './focus.js';
 import { addDays, compareDates, daysBetween, ageInDays, dateOf } from './dates.js';
 import { redoStats } from './redo.js';
@@ -9,7 +9,7 @@ import { nextTest, dayPhase } from './phase.js';
 
 /** Attempts in date order with the estimated composite as of each one. */
 export function trendSeries(attempts) {
-  const sorted = attempts
+  const sorted = dedupeAttempts(attempts)
     .filter((a) => a && a.scores)
     .slice()
     .sort((a, b) => compareDates(a.date, b.date) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')) || String(a.id).localeCompare(String(b.id)));
