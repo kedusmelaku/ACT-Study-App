@@ -68,7 +68,7 @@ export function taskCard(t, { showActions = true, collapsed = false } = {}) {
           ${movable ? html`<button class="btn btn-ghost btn-sm reschedule-btn" data-action="reschedule" data-id="${t.id}">${icon('plan')}Reschedule</button>` : ''}`
         : ''}
       ${showActions && movable && t.status === 'skipped' && !t.dropped
-        ? html`<button class="btn btn-ghost btn-sm reschedule-btn" data-action="reschedule" data-id="${t.id}">${icon('plan')}Reschedule</button>`
+        ? html`<button class="btn btn-sm btn-secondary reschedule-cta" data-action="reschedule" data-id="${t.id}">${icon('plan')}Reschedule to another day</button>`
         : ''}
       ${showActions && movable && collapsed && t.status === 'todo'
         ? html`<div class="task-more-actions" hidden><button class="btn btn-ghost btn-sm reschedule-btn" data-action="reschedule" data-id="${t.id}">${icon('plan')}Reschedule</button></div>`

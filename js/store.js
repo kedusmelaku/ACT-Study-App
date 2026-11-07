@@ -448,7 +448,9 @@ export async function setTaskStatus(id, status) {
   state.tasks = state.tasks.map((x) => (x.id === id ? next : x));
   const removeIds = new Set(removeUse.map((u) => u.id));
   state.materialUse = [...state.materialUse.filter((u) => !removeIds.has(u.id) && !addUse.some((a) => a.id === u.id)), ...addUse];
-  emit();
+  // Skipping or un-skipping a full test changes what the rest of the week needs (the "log the test" task).
+  if (t.type === 'full_test') await regenerateAndEmit();
+  else emit();
 }
 
 /**

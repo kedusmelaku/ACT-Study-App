@@ -349,7 +349,11 @@ svg:not([width]) { width: 20px; height: 20px; flex: none; }
 .task-actions .btn { flex: 1; }
 .task.is-done { opacity: 0.62; }
 .task.is-done .task-title { text-decoration: line-through; text-decoration-thickness: 1.5px; }
-.task.is-skipped, .task.is-moved { opacity: 0.55; }
+/* Fade a skipped or moved task's content, but keep its Reschedule button at full strength. */
+.task.is-skipped > .task-body > :not(.reschedule-cta),
+.task.is-moved > .task-body > :not(.reschedule-cta) { opacity: 0.55; }
+.task.is-skipped::before, .task.is-moved::before { opacity: 0.55; }
+.reschedule-cta { margin-top: 12px; width: 100%; }
 .check {
   flex: none; width: 30px; height: 30px; border-radius: 99px; border: 2px solid var(--border);
   display: grid; place-items: center; background: transparent; cursor: pointer; margin-top: 1px; color: transparent;
