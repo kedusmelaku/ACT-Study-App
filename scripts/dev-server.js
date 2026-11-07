@@ -1,10 +1,11 @@
 // Local server without the Vercel CLI: serves the static app and the two API routes.
-// Usage: ANTHROPIC_API_KEY=... APP_PASSCODE=... node scripts/dev-server.js [port]
+// Usage: APP_PASSCODE=... [UPSTASH_REDIS_REST_URL=... UPSTASH_REDIS_REST_TOKEN=...] [ANTHROPIC_API_KEY=...] node scripts/dev-server.js [port]
 import http from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
 import explain from '../api/explain.js';
 import coach from '../api/coach.js';
+import sync from '../api/sync.js';
 
 const root = resolve(new URL('..', import.meta.url).pathname);
 const port = Number(process.argv[2]) || 3000;
@@ -17,7 +18,7 @@ const TYPES = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
 };
-const ROUTES = { '/api/explain': explain, '/api/coach': coach };
+const ROUTES = { '/api/explain': explain, '/api/coach': coach, '/api/sync': sync };
 
 http
   .createServer(async (req, res) => {

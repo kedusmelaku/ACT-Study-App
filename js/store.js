@@ -8,6 +8,7 @@ import { generateWeek, heavyNight as planHeavyNight } from './logic/planner.js';
 import { createRedo, answerRedo as logicAnswerRedo } from './logic/redo.js';
 import { todayISO, isISODate, dateOf } from './logic/dates.js';
 import { weekStartFor } from './logic/phase.js';
+import { incomingWrites, isSyncedSetting } from './logic/sync.js';
 
 export const state = {
   ready: false,
@@ -100,9 +101,54 @@ function withDefaults(s) {
   return out;
 }
 
+/** Live records only; tombstones stay in IndexedDB for sync. */
+function loadState(all) {
+  for (const k of Object.keys(all)) if (k !== 'settings') state[k] = all[k].filter(db.isLive);
+}
+
+/**
+ * New settings object with `patch` applied. Synced fields that changed get an edit time,
+ * so sync can merge settings field by field.
+ */
+function nextSettings(patch) {
+  const now = new Date().toISOString();
+  const times = { ...(state.settings._fieldTimes || {}) };
+  for (const [k, v] of Object.entries(patch)) {
+    if (isSyncedSetting(k) && JSON.stringify(state.settings[k]) !== JSON.stringify(v)) times[k] = now;
+  }
+  return { ...state.settings, ...patch, _fieldTimes: times };
+}
+
+/**
+ * One-time upgrade for data saved before sync existed: give every record edit stamps so it uploads
+ * on the first sync, and give an already set-up device per-field settings times so its settings win
+ * over a brand-new device's defaults.
+ */
+async function upgradeForSync(all) {
+  const now = new Date().toISOString();
+  const ops = [];
+  for (const [name, rows] of Object.entries(all)) {
+    if (name === 'settings') continue;
+    for (const r of rows) {
+      if (r.updatedAt) continue;
+      const value = { ...r, updatedAt: r.createdAt && /^\d{4}-/.test(r.createdAt) ? r.createdAt : now, _localAt: now };
+      ops.push({ store: name, type: 'put', value, raw: true });
+    }
+  }
+  const s = all.settings.find((x) => x.id === 'settings');
+  if (s && !s._fieldTimes) {
+    const times = {};
+    if (s.onboarded) for (const k of Object.keys(s)) if (isSyncedSetting(k)) times[k] = now;
+    ops.push({ store: 'settings', type: 'put', value: { ...s, _fieldTimes: times }, raw: true });
+  }
+  if (!ops.length) return all;
+  await db.batch(ops);
+  return db.loadAll();
+}
+
 export async function init() {
-  const all = await db.loadAll();
-  for (const k of Object.keys(all)) if (k !== 'settings') state[k] = all[k];
+  const all = await upgradeForSync(await db.loadAll());
+  loadState(all);
   const stored = all.settings.find((s) => s.id === 'settings');
   state.settings = withDefaults(stored);
   if (!stored) await db.put('settings', state.settings);
@@ -113,9 +159,8 @@ export async function init() {
 
 async function reloadFromDB() {
   const all = await db.loadAll();
-  for (const k of Object.keys(all)) if (k !== 'settings') state[k] = all[k];
+  loadState(all);
   state.settings = withDefaults(all.settings.find((s) => s.id === 'settings'));
-  await db.put('settings', state.settings);
 }
 
 // ---------------------------------------------------------------- plan
@@ -135,14 +180,24 @@ export async function regenerate() {
     existingTasks: state.tasks,
   });
   const before = state.tasks.filter((t) => t.weekStart === weekStart);
+  const beforeById = new Map(before.map((t) => [t.id, t]));
   const keep = new Set(tasks.map((t) => t.id));
   const ops = [];
   for (const t of before) if (!keep.has(t.id)) ops.push({ store: 'tasks', type: 'delete', key: t.id });
-  for (const t of tasks) ops.push({ store: 'tasks', type: 'put', value: t });
+  // Only write tasks that actually changed, so a regeneration doesn't look like new edits to sync.
+  for (const t of tasks) if (!sameTask(beforeById.get(t.id), t)) ops.push({ store: 'tasks', type: 'put', value: t });
   state.settings = { ...state.settings, planWeek: weekStart, planNotes: notes };
   ops.push({ store: 'settings', type: 'put', value: state.settings });
   await db.batch(ops);
   state.tasks = [...state.tasks.filter((t) => t.weekStart !== weekStart), ...tasks];
+}
+
+function taskBody(t) {
+  const { updatedAt, _localAt, ...rest } = t;
+  return JSON.stringify(rest, Object.keys(rest).sort());
+}
+function sameTask(a, b) {
+  return !!a && taskBody(a) === taskBody(b);
 }
 
 /** Called on start and on focus: a new week regenerates the plan. */
@@ -166,7 +221,7 @@ async function regenerateAndEmit() {
 // ---------------------------------------------------------------- settings
 
 export async function saveSettings(patch, { regen = false } = {}) {
-  state.settings = { ...state.settings, ...patch };
+  state.settings = nextSettings(patch);
   await db.put('settings', state.settings);
   if (regen) await regenerateAndEmit();
   else emit();
@@ -399,7 +454,7 @@ export async function heavyNight() {
   const t = today();
   const weekStart = currentWeekStart();
   const heavy = [...new Set([...(state.settings.heavyNights || []), t])];
-  const settings = { ...state.settings, heavyNights: heavy };
+  const settings = nextSettings({ heavyNights: heavy });
   const result = planHeavyNight({ tasks: weekTasks(weekStart), today: t, settings, weekStart });
   const ops = result.tasks.map((x) => ({ store: 'tasks', type: 'put', value: x }));
   ops.push({ store: 'settings', type: 'put', value: settings });
@@ -443,7 +498,7 @@ export async function undoHeavyNight() {
     }
     next.push(x);
   }
-  state.settings = { ...state.settings, heavyNights: heavy };
+  state.settings = nextSettings({ heavyNights: heavy });
   ops.push({ store: 'settings', type: 'put', value: state.settings });
   await db.batch(ops);
   state.tasks = next;
@@ -470,6 +525,36 @@ export async function importBackup(obj, mode) {
   await db.importData(obj, mode);
   await reloadFromDB();
   if (state.settings.onboarded) await regenerate();
+  emit();
+}
+
+// ---------------------------------------------------------------- sync
+
+/** Write records pulled from sync (only the ones edited later than what's here), then refresh. */
+export async function applySync(records, syncPatch) {
+  const raw = await db.loadAll();
+  const { puts, settingsPatch, fieldTimes } = incomingWrites(raw, records);
+  const ops = puts.map((p) => ({ store: p.store, type: 'put', value: p.value, fromSync: true }));
+  const rawSettings = raw.settings.find((s) => s.id === 'settings') || state.settings;
+  const settings = withDefaults({
+    ...rawSettings,
+    ...settingsPatch,
+    _fieldTimes: { ...(rawSettings._fieldTimes || {}), ...fieldTimes },
+    sync: { ...(rawSettings.sync || {}), ...syncPatch },
+  });
+  ops.push({ store: 'settings', type: 'put', value: settings, fromSync: true });
+  await db.batch(ops);
+  await reloadFromDB();
+  const changed = puts.length > 0 || Object.keys(settingsPatch).length > 0;
+  if (changed && state.settings.onboarded) await regenerate();
+  emit();
+  return { applied: puts.length + Object.keys(settingsPatch).length };
+}
+
+/** Save device-only sync state (enabled, cursors, last error) without marking anything for upload. */
+export async function saveSyncState(patch) {
+  state.settings = { ...state.settings, sync: { ...(state.settings.sync || {}), ...patch } };
+  await db.batch([{ store: 'settings', type: 'put', value: state.settings, fromSync: true }]);
   emit();
 }
 

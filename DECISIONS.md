@@ -74,3 +74,16 @@ Judgment calls made without asking. One line each: what, then why.
 - In chat mode the photo goes straight into the Claude chat, so the app never handles it; a switch adds "a photo is attached" to the prompt.
 - "Open Claude" links to claude.ai/new; on Android, Chrome may hand it to the Claude app if installed.
 - The coach is still one note per week in chat mode, and the Apply button only appears when the pasted reply has a valid weekday setting.
+
+## Cross-device sync
+- Sync is local-first: IndexedDB stays the working copy, and `/api/sync` pushes this device's changes and pulls everyone else's, so the app still works fully offline.
+- Storage is Upstash Redis through its REST API with plain `fetch`, because it has a free tier, connects to Vercel in a few clicks, and needs no SDK; both Upstash's and Vercel's env var names are accepted.
+- Conflicts resolve per record, newest edit wins, decided atomically in a Redis Lua script; for one person on two devices, clashing edits to the same item are rare.
+- Settings sync field by field, so changing study time on the phone and test dates on the laptop both survive.
+- The passcode, Claude mode, last-backup date, plan bookkeeping, and sync state stay on each device.
+- Deletes become tombstones that sync, and undo simply rewrites the record with a newer time.
+- Pulls are delta-based (a change log with sequence numbers, 500 records per page), so requests stay small as the log grows.
+- Plan regeneration only rewrites tasks whose content changed, so two devices regenerating the same plan don't keep re-uploading it.
+- A one-time upgrade stamps data saved before sync existed, so a device's existing log uploads on its first sync, and its settings outrank a brand-new device's defaults.
+- One `APP_PASSCODE` guards sync and the built-in Claude mode; no device-side encryption, at the user's request.
+- Sync runs on open, on returning to the app, when the connection comes back, 4 seconds after an edit, and every 3 minutes while the app is visible.

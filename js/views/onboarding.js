@@ -1,7 +1,8 @@
 // First-run setup: test date, study time, benchmark, backup note.
 import { html, setHTML } from '../safe-html.js';
 import * as store from '../store.js';
-import { icon, reportError, fmtMinutes } from '../ui.js';
+import { icon, reportError, fmtMinutes, openSheet, toast } from '../ui.js';
+import { enableSync } from '../sync.js';
 import { DAY_NAMES } from '../data/calendar.js';
 import { isISODate, formatDate, daysBetween } from '../logic/dates.js';
 
@@ -39,6 +40,7 @@ export function render(el, ctx) {
       ${days !== null && days >= 0 ? html`<div class="notice notice-info">${icon('flag')}<div class="grow">${formatDate(st.date, { year: true })}, ${days} days away. You can add more test dates later, like the April school-day ACT.</div></div>` : ''}
       <p class="error-text" data-error hidden></p>
       <div class="sticky-actions"><button class="btn" data-action="next">Next</button></div>
+      <button class="btn btn-ghost btn-block" data-action="connect">I already use ACT Prep on another device</button>
     </div>`;
   };
 
@@ -114,6 +116,8 @@ export function render(el, ctx) {
     } else if (b.dataset.action === 'back') {
       st.step--;
       draw();
+    } else if (b.dataset.action === 'connect') {
+      await connectExisting(ctx);
     } else if (b.dataset.action === 'finish') {
       b.disabled = true;
       try {
@@ -145,4 +149,43 @@ export function render(el, ctx) {
   });
 
   draw();
+}
+
+/** Second device: enter the passcode, pull everything, and skip setup. */
+async function connectExisting(ctx) {
+  const done = await openSheet(
+    html`<h2>Connect this device</h2>
+      <p class="small muted">Enter the app passcode from your other device (Settings, Sync). Your tests, log, and plan will download here.</p>
+      <form class="stack" data-connect>
+        <input class="input" name="passcode" type="password" autocomplete="current-password" placeholder="App passcode" required>
+        <p class="error-text" data-error hidden></p>
+        <div class="sheet-actions"><button type="button" class="btn btn-secondary" data-close="">Cancel</button><button class="btn" type="submit">Connect</button></div>
+      </form>`,
+    (root, close) => {
+      const form = root.querySelector('[data-connect]');
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = form.querySelector('[type=submit]');
+        const err = form.querySelector('[data-error]');
+        btn.disabled = true;
+        btn.textContent = 'Connecting';
+        const problem = await enableSync(form.elements.passcode.value);
+        btn.disabled = false;
+        btn.textContent = 'Connect';
+        if (problem) {
+          err.textContent = problem;
+          err.hidden = false;
+          return;
+        }
+        close('ok');
+      });
+    },
+  );
+  if (done !== 'ok') return;
+  if (store.state.settings.onboarded) {
+    toast('Connected. Your data is here.');
+    ctx.navigate('#/today', { replace: true });
+  } else {
+    toast('Connected, but no data was found yet. Finish setup here, or sync your other device first.');
+  }
 }

@@ -7,6 +7,7 @@ import { SECTIONS, ALL_SECTIONS } from '../data/act.js';
 import { SEED_MATERIALS } from '../data/materials.js';
 import { formatDate, isISODate, compareDates, dateOf } from '../logic/dates.js';
 import { validateImport } from '../db.js';
+import { syncNow, enableSync, disableSync } from '../sync.js';
 
 export const live = true;
 
@@ -150,6 +151,11 @@ export function render(el) {
           : html`<p class="small muted">Add your own topics from the topic picker when you log a miss.</p>`}
       </section>
 
+      <section class="stack" id="sync">
+        <div class="section-title"><h2>Sync across devices</h2>${s.sync && s.sync.enabled ? html`<span class="badge badge-success">On</span>` : ''}</div>
+        ${syncCard(s)}
+      </section>
+
       <section class="stack" id="claude">
         <div class="section-title"><h2>Claude</h2></div>
         <div class="card stack">
@@ -192,6 +198,36 @@ export function render(el) {
   );
 
   bind(el);
+}
+
+function ago(iso) {
+  if (!iso) return 'never';
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs} hr ago`;
+  return formatDate(dateOf(iso));
+}
+
+function syncCard(s) {
+  const sync = s.sync || {};
+  if (!sync.enabled) {
+    return html`<form class="card stack" data-sync-form>
+      <p class="small muted">Keep your phone and laptop in step: tests, the error log, redos, the plan, and settings. Needs the sync database set up in Vercel (see the README).</p>
+      <div class="field"><label for="sync-pass">App passcode</label>
+        <input class="input" id="sync-pass" name="passcode" type="password" autocomplete="current-password" maxlength="200" value="${s.passcode || ''}" placeholder="The APP_PASSCODE you set in Vercel"></div>
+      <p class="hint">Use the same passcode on every device.</p>
+      <button class="btn" type="submit">Turn on sync</button>
+    </form>`;
+  }
+  return html`<div class="card stack">
+    <div class="spread"><div><div class="strong">${sync.lastError ? 'Not synced' : 'Synced'}</div><div class="small muted">Last sync ${ago(sync.lastSyncAt)}</div></div>
+      <button class="btn btn-sm btn-secondary" data-action="sync-now">Sync now</button></div>
+    ${sync.lastError ? notice('warn', sync.lastError) : ''}
+    <p class="hint">Syncs when the app opens, a few seconds after changes, and every few minutes while open. Works offline and catches up later.</p>
+    <button class="btn btn-ghost btn-sm" data-action="sync-off">Turn off sync on this device</button>
+  </div>`;
 }
 
 async function save(patch, regen = true, message = '') {
@@ -306,6 +342,21 @@ function bind(el) {
     }
     if (a === 'remove-full') return save({ fullTests: (s.fullTests || []).filter((f) => f.date !== b.dataset.date) });
     if (a === 'export') return doExport();
+    if (a === 'sync-now') {
+      b.disabled = true;
+      b.textContent = 'Syncing';
+      try {
+        await syncNow();
+        toast('Synced.');
+      } catch {
+        // The card shows the reason.
+      }
+      return;
+    }
+    if (a === 'sync-off') {
+      await disableSync();
+      toast('Sync is off on this device. Your data stays here.');
+    }
   });
 
   el.addEventListener('change', async (e) => {
@@ -332,7 +383,22 @@ function bind(el) {
     }
   });
 
-  el.addEventListener('submit', (e) => {
+  el.addEventListener('submit', async (e) => {
+    const sf = e.target.closest('[data-sync-form]');
+    if (sf) {
+      e.preventDefault();
+      const pass = sf.elements.passcode.value.trim();
+      if (!pass) {
+        toast('Enter the app passcode first.');
+        return;
+      }
+      const btn = sf.querySelector('[type=submit]');
+      btn.disabled = true;
+      btn.textContent = 'Connecting';
+      const problem = await enableSync(pass);
+      toast(problem || 'Sync is on.');
+      return;
+    }
     const f = e.target.closest('[data-passcode-form]');
     if (!f) return;
     e.preventDefault();

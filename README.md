@@ -6,7 +6,7 @@ It is not a question bank. Official ACT materials are the practice source. The a
 
 - Plain HTML, CSS, and JS (ES modules). No framework, no build step.
 - Installable PWA that works offline (except the Claude features).
-- Data lives on your device in IndexedDB. Export a backup from Settings.
+- Data lives on your device in IndexedDB, so it works offline. Optional sync keeps your phone and laptop in step through a free Upstash Redis database. Export a backup from Settings any time.
 - Explain and Coach work for free through your own Claude chat (claude.ai or the Claude app): the app copies a ready-made prompt, you paste Claude's reply back. No API key needed.
 - An optional built-in mode calls Claude for you through a small proxy in `/api`, so the API key never reaches the browser. It uses paid API credits.
 
@@ -17,6 +17,21 @@ It is not a question bank. Official ACT materials are the practice source. The a
 3. Copy Claude's whole reply, paste it back into the app, and tap **Read reply**. Then save it to the miss.
 
 The weekly coach on Progress works the same way. Its prompt holds only your numbers, never questions or notes. Switch modes in Settings, under Claude.
+
+## Sync across devices
+
+Each device keeps its own copy and works offline. When online, it pushes what it changed and pulls what other devices changed. If the same item was edited on two devices, the later edit wins. Deletes sync too.
+
+### One-time setup
+
+1. **Create the database.** In your Vercel project, open the **Storage** tab, pick **Upstash for Redis** from the marketplace, choose the free plan, and connect it to this project. Vercel adds `KV_REST_API_URL` and `KV_REST_API_TOKEN` for you.
+   (Or create a free Redis database at upstash.com and add its `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` to Vercel yourself. Either pair works.)
+2. **Set a passcode.** In Vercel, **Settings, Environment Variables**, add `APP_PASSCODE` with a long random value. This one passcode protects sync and the optional built-in Claude mode.
+3. **Redeploy** so the functions see the new variables (Deployments, the latest one, Redeploy).
+4. **First device (the one with your data):** Settings, Sync across devices, enter the passcode, **Turn on sync**. Everything already on the device uploads.
+5. **Other devices:** open the app. On the first setup screen, tap **I already use ACT Prep on another device** and enter the passcode. If you already set that device up, use Settings, Sync instead.
+
+Settings, Sync shows when it last synced and any problem in plain words. A few things stay on each device: the passcode, the Claude mode, and the last-backup date.
 
 ## Run it locally
 
@@ -31,7 +46,7 @@ That serves the static app and the `/api` routes at http://localhost:3000. The f
 No Vercel account handy? This runs the same thing with plain Node:
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-... APP_PASSCODE=pick-a-passcode node scripts/dev-server.js 3000
+APP_PASSCODE=pick-a-passcode UPSTASH_REDIS_REST_URL=... UPSTASH_REDIS_REST_TOKEN=... node scripts/dev-server.js 3000
 ```
 
 Tests and checks:
@@ -54,15 +69,16 @@ Every push to a branch gets a preview URL, which is a good place to try Explain 
 
 When you change any file the app caches, bump `CACHE_VERSION` in `sw.js` so phones pick up the new version.
 
-## Environment variables (built-in mode only)
+## Environment variables
 
-Only needed if you switch Settings to **Built-in (API)**. Set these in Vercel. Never commit them.
+Set these in Vercel. Never commit them.
 
 | Name | What it is |
 |---|---|
-| `ANTHROPIC_API_KEY` | Your Anthropic API key, from the Anthropic Console. |
-| `APP_PASSCODE` | Any passcode you choose. Enter the same one in the app under Settings, Claude. Requests without it get a 401. |
-| `CLAUDE_MODEL` | Optional. Defaults to `claude-sonnet-5-5`. |
+| `APP_PASSCODE` | Needed for sync and for built-in Claude. Any long random value; enter the same one on each device. |
+| `KV_REST_API_URL`, `KV_REST_API_TOKEN` | Sync database. Added automatically when you connect Upstash Redis in Vercel's Storage tab. `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` also work. |
+| `ANTHROPIC_API_KEY` | Built-in Claude mode only. Your Anthropic API key, from the Anthropic Console. |
+| `CLAUDE_MODEL` | Built-in Claude mode only, optional. Defaults to `claude-sonnet-5-5`. |
 
 **Set a monthly spend limit in the Anthropic Console** (Settings, Limits). The app caps each request (700 output tokens for Explain, 400 for Coach, 2 MB per request, photos resized to 1568px JPEG), but a spend limit is the real safety net.
 
@@ -101,6 +117,8 @@ js/logic/*           pure logic: scoring, focus, planner, redo, dates, phase, pr
 js/views/*           one module per screen
 api/_auth.js         passcode check and body limits
 api/_claude.js       Anthropic Messages API call
-api/explain.js, api/coach.js
+api/_redis.js        Upstash Redis REST client
+api/explain.js, api/coach.js, api/sync.js
+js/sync.js           background sync on the device
 tests/*.test.js
 ```

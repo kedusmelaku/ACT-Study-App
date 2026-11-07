@@ -3,6 +3,7 @@ import { html, setHTML } from './safe-html.js';
 import * as store from './store.js';
 import { icon, toast } from './ui.js';
 import { dueRedos } from './logic/redo.js';
+import { startSync } from './sync.js';
 
 import * as today from './views/today.js';
 import * as plan from './views/plan.js';
@@ -165,6 +166,7 @@ async function boot() {
     return;
   }
   store.subscribe(rerender);
+  startSync();
   window.addEventListener('hashchange', route);
   window.addEventListener('online', rerender);
   window.addEventListener('offline', rerender);

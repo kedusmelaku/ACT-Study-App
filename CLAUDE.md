@@ -61,7 +61,7 @@ Put all of these values in `js/data/act.js` as constants. Nothing else should ha
   - Never cache `/api/*`.
 - **Storage:** IndexedDB on the device, through a small wrapper (`js/db.js`).
   - Keep a schema version number and run migrations when it changes.
-  - No backend database for this version. The only server code is the Claude proxy.
+  - Optional cross-device sync goes through `/api/sync` and an Upstash Redis store; the device copy stays the source that works offline.
 - **Safe rendering:** build all markup with an `html` tagged template plus `setHTML(el, ...)` in `js/safe-html.js`. The template escapes every interpolated value by default and has an explicit `raw()` escape hatch for trusted strings only.
   - Never assign interpolated data to `innerHTML`.
   - Attach event handlers with `data-*` attributes plus `addEventListener`, never inline handlers.

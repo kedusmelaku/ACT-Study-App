@@ -1,4 +1,9 @@
 // IndexedDB wrapper with schema migrations and JSON export/import.
+//
+// Sync support: every put is stamped with `updatedAt` (edit time) and `_localAt` (written on this device),
+// and a delete leaves a tombstone `{ key, deleted: true }` so the delete can reach other devices.
+// Writes that come from sync pass `fromSync: true` and keep the incoming `updatedAt`.
+import { tombstone } from './logic/sync.js';
 
 export const DB_NAME = 'act-prep';
 /** Bump when stores or indexes change, and add a migration below. */
@@ -84,36 +89,60 @@ export async function get(store, key) {
 }
 
 export async function put(store, value) {
-  const db = await openDB();
-  const tx = db.transaction(store, 'readwrite');
-  tx.objectStore(store).put(value);
-  await done(tx);
+  await batch([{ store, type: 'put', value }]);
   return value;
 }
 
 export async function del(store, key) {
-  const db = await openDB();
-  const tx = db.transaction(store, 'readwrite');
-  tx.objectStore(store).delete(key);
-  await done(tx);
+  await batch([{ store, type: 'delete', key }]);
+}
+
+const localWriteListeners = new Set();
+/** Called after any write made on this device (not writes that came from sync). */
+export function onLocalWrite(fn) {
+  localWriteListeners.add(fn);
+  return () => localWriteListeners.delete(fn);
 }
 
 /**
  * Several writes in one transaction.
- * ops: [{ store, type: 'put' | 'delete' | 'clear', value?, key? }]
+ * ops: [{ store, type: 'put' | 'delete', value?, key?, fromSync?, raw? }]
+ * raw: write the value exactly as given (used by the one-time upgrade).
+ * 'delete' writes a tombstone so the delete syncs.
  */
 export async function batch(ops) {
   if (!ops.length) return;
   const db = await openDB();
+  const now = new Date().toISOString();
   const names = [...new Set(ops.map((o) => o.store))];
   const tx = db.transaction(names, 'readwrite');
+  let local = false;
   for (const op of ops) {
     const os = tx.objectStore(op.store);
-    if (op.type === 'put') os.put(op.value);
-    else if (op.type === 'delete') os.delete(op.key);
-    else if (op.type === 'clear') os.clear();
+    if (op.raw) {
+      os.put(op.value);
+      continue;
+    }
+    if (op.fromSync) {
+      os.put({ ...op.value, _localAt: '' });
+      continue;
+    }
+    local = true;
+    if (op.type === 'put') os.put({ ...op.value, updatedAt: now, _localAt: now });
+    else if (op.type === 'delete') os.put({ ...tombstone(op.store, op.key, now), _localAt: now });
   }
   await done(tx);
+  if (local) for (const fn of localWriteListeners) fn();
+}
+
+/** True for a live record (not a tombstone). */
+export function isLive(r) {
+  return !!r && !r.deleted;
+}
+
+function clean(r) {
+  const { _localAt, ...rest } = r;
+  return rest;
 }
 
 export async function loadAll() {
@@ -127,9 +156,11 @@ export async function loadAll() {
 export const EXPORT_APP = 'act-prep';
 
 export async function exportAll(now = new Date()) {
-  const data = await loadAll();
-  // The passcode stays on this device.
-  data.settings = data.settings.map((s) => ({ ...s, passcode: '' }));
+  const all = await loadAll();
+  const data = {};
+  for (const name of STORE_NAMES) data[name] = all[name].filter(isLive).map(clean);
+  // The passcode and sync state stay on this device.
+  data.settings = data.settings.map((s) => ({ ...s, passcode: '', sync: undefined }));
   return { app: EXPORT_APP, schemaVersion: SCHEMA_VERSION, exportedAt: now.toISOString(), data };
 }
 
@@ -181,15 +212,31 @@ export async function importData(obj, mode) {
   if (!check.ok) throw new Error('Invalid backup');
   const ops = [];
   const currentSettings = await get('settings', 'settings');
+  const existing = mode === 'replace' ? await loadAll() : null;
   for (const name of STORE_NAMES) {
-    if (mode === 'replace') ops.push({ store: name, type: 'clear' });
+    if (mode === 'replace' && name !== 'settings') {
+      // Replacing deletes what isn't in the backup (as tombstones, so other devices follow).
+      const kp = STORES[name].keyPath;
+      const incoming = new Set((obj.data[name] || []).map((r) => String(r[kp])));
+      for (const r of existing[name]) if (isLive(r) && !incoming.has(String(r[kp]))) ops.push({ store: name, type: 'delete', key: r[kp] });
+    }
     // Merging keeps this device's settings; replacing takes the backup's.
     if (name === 'settings' && mode === 'merge' && currentSettings) continue;
     for (const row of obj.data[name] || []) {
       let value = row;
       if (name === 'settings') {
         // Keep the passcode that is already on this device.
-        value = { ...row, passcode: (currentSettings && currentSettings.passcode) || row.passcode || '' };
+        // Keep this device's passcode and sync state; mark every synced field as just edited so it spreads.
+        const times = {};
+        const stamp = new Date().toISOString();
+        for (const f of Object.keys(row)) times[f] = stamp;
+        value = {
+          ...row,
+          passcode: (currentSettings && currentSettings.passcode) || row.passcode || '',
+          claudeMode: (currentSettings && currentSettings.claudeMode) || row.claudeMode,
+          sync: currentSettings && currentSettings.sync,
+          _fieldTimes: { ...((currentSettings && currentSettings._fieldTimes) || {}), ...times },
+        };
       }
       ops.push({ store: name, type: 'put', value });
     }
