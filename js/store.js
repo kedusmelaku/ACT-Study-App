@@ -4,7 +4,7 @@ import { defaultSettings } from './data/calendar.js';
 import { buildMaterials } from './data/materials.js';
 import { ALL_SECTIONS } from './data/act.js';
 import { computeFocus } from './logic/focus.js';
-import { generateWeek, heavyNight as planHeavyNight } from './logic/planner.js';
+import { generateWeek, heavyNight as planHeavyNight, rescheduleTask as planReschedule, rescheduleProblem } from './logic/planner.js';
 import { createRedo, answerRedo as logicAnswerRedo } from './logic/redo.js';
 import { todayISO, isISODate, dateOf } from './logic/dates.js';
 import { weekStartFor } from './logic/phase.js';
@@ -447,6 +447,39 @@ export async function setTaskStatus(id, status) {
   const removeIds = new Set(removeUse.map((u) => u.id));
   state.materialUse = [...state.materialUse.filter((u) => !removeIds.has(u.id) && !addUse.some((a) => a.id === u.id)), ...addUse];
   emit();
+}
+
+/**
+ * Move a todo or skipped task to another day. Throws an error with a plain `userMessage` if it can't.
+ * Returns an undo function.
+ */
+export async function rescheduleTask(id, toDate) {
+  const task = state.tasks.find((t) => t.id === id);
+  const problem = rescheduleProblem(task, toDate, today(), state.settings);
+  if (problem) throw Object.assign(new Error(problem), { userMessage: problem });
+  const before = { task: { ...task }, fullTests: state.settings.fullTests };
+  const { original, copy, settingsPatch } = planReschedule(task, toDate, state.settings);
+  const ops = [{ store: 'tasks', type: 'put', value: original }];
+  if (copy) ops.push({ store: 'tasks', type: 'put', value: copy });
+  if (settingsPatch) {
+    state.settings = nextSettings(settingsPatch);
+    ops.push({ store: 'settings', type: 'put', value: state.settings });
+  }
+  await db.batch(ops);
+  state.tasks = state.tasks.map((t) => (t.id === id ? original : t));
+  if (copy) state.tasks = [...state.tasks.filter((t) => t.id !== copy.id), copy];
+  await regenerateAndEmit();
+  return async () => {
+    const undoOps = [{ store: 'tasks', type: 'put', value: before.task }];
+    if (copy) undoOps.push({ store: 'tasks', type: 'delete', key: copy.id });
+    if (settingsPatch) {
+      state.settings = nextSettings({ fullTests: before.fullTests });
+      undoOps.push({ store: 'settings', type: 'put', value: state.settings });
+    }
+    await db.batch(undoOps);
+    state.tasks = state.tasks.filter((t) => !copy || t.id !== copy.id).map((t) => (t.id === id ? before.task : t));
+    await regenerateAndEmit();
+  };
 }
 
 /** Heavy night: move tonight's tasks later this week. Returns the one-line message. */

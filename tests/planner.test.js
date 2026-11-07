@@ -127,3 +127,36 @@ test('a skipped full test adds no "log the test" task and stays available for a 
   const sunday = moved.tasks.find((t) => t.date === '2026-11-08' && t.type === 'full_test');
   assert.equal(sunday.materialRef.sourceId, 'enhanced-1');
 });
+
+test('rescheduling a drill pins a copy on the new day that regeneration keeps', async () => {
+  const { rescheduleTask, rescheduleProblem } = await import('../js/logic/planner.js');
+  const s = mkSettings();
+  const first = plan({ weekStart: '2026-11-14', today: '2026-11-16', misses: [miss('reading', 'Inference', 'trap', '2026-11-13')] });
+  const mon = first.tasks.find((t) => t.date === '2026-11-16' && t.type === 'drill');
+  assert.equal(rescheduleProblem(mon, '2026-11-15', '2026-11-16', s), 'Pick today or a later day.');
+  const { original, copy } = rescheduleTask(mon, '2026-11-19', s);
+  assert.equal(original.status, 'moved');
+  assert.equal(copy.date, '2026-11-19');
+  assert.equal(copy.pinned, true);
+  const tasks = first.tasks.map((t) => (t.id === mon.id ? original : t)).concat(copy);
+  const again = plan({ weekStart: '2026-11-14', today: '2026-11-16', existingTasks: tasks, misses: [miss('reading', 'Inference', 'trap', '2026-11-13')] });
+  assert.ok(again.tasks.some((t) => t.id === copy.id && t.date === '2026-11-19'), 'pinned copy survives regeneration');
+  assert.ok(!again.tasks.some((t) => t.date === '2026-11-16' && t.status === 'todo'), 'the day it moved off is not refilled');
+});
+
+test('rescheduling a full test moves its full-test day and the planner builds it there', async () => {
+  const { rescheduleTask, rescheduleProblem } = await import('../js/logic/planner.js');
+  const s = mkSettings({ availability: { ...mkSettings().availability, 0: 180 } });
+  const first = plan({ weekStart: '2026-11-07', today: '2026-11-07', s });
+  const full = first.tasks.find((t) => t.type === 'full_test');
+  const { original, settingsPatch } = rescheduleTask(full, '2026-11-08', s);
+  assert.deepEqual(settingsPatch.fullTests.map((f) => f.date), ['2026-11-08', '2026-11-25']);
+  const s2 = { ...s, ...settingsPatch };
+  const tasks = first.tasks.map((t) => (t.id === full.id ? original : t));
+  const again = plan({ weekStart: '2026-11-07', today: '2026-11-07', existingTasks: tasks, s: s2 });
+  const sunday = again.tasks.find((t) => t.date === '2026-11-08' && t.type === 'full_test');
+  assert.equal(sunday.materialRef.sourceId, 'enhanced-1');
+  assert.ok(!again.tasks.some((t) => t.type === 'log_test' && t.date === '2026-11-08'));
+  assert.equal(rescheduleProblem(full, '2026-11-25', '2026-11-07', s), 'Another full test is already on that day.');
+  assert.equal(rescheduleProblem(full, '2026-12-10', '2026-11-07', s), 'No studying is planned that day. Pick another day.');
+});

@@ -2,7 +2,7 @@
 // the same inputs always produce the same plan.
 import { SECTIONS, CORE_SECTIONS, ALL_SECTIONS, LEGACY_SECTIONS, ENHANCED_PARTS, FULL_TEST_BREAK_MINUTES, FOCUS, REDO, minutesAtPace } from '../data/act.js';
 import { weekDates, compareDates } from './dates.js';
-import { dayPhase, dayCapacity, isNoStudyDay } from './phase.js';
+import { dayPhase, dayCapacity, isNoStudyDay, weekStartFor, fullTestOn } from './phase.js';
 import { dueByDate } from './redo.js';
 
 const MIN_SLOT = 15;
@@ -397,7 +397,8 @@ function taskId(date, slot, type, section, taken) {
 }
 
 function keptMinutes(t) {
-  if (t.status === 'moved' || t.dropped) return 0;
+  // A task moved off a day still holds its time there, so that day isn't refilled with new work.
+  if (t.dropped) return 0;
   return Number(t.minutes) || 0;
 }
 
@@ -412,7 +413,8 @@ function keptMinutes(t) {
 export function generateWeek({ weekStart, today, settings, focus, redos = [], materials = [], materialUse = [], attempts = [], existingTasks = [] }) {
   const dates = weekDates(weekStart);
   const inWeek = existingTasks.filter((t) => t.weekStart === weekStart);
-  const kept = inWeek.filter((t) => t.status !== 'todo' || compareDates(t.date, today) < 0);
+  // Rescheduled tasks are pinned: regeneration keeps them like finished ones.
+  const kept = inWeek.filter((t) => t.status !== 'todo' || t.pinned || compareDates(t.date, today) < 0);
   const taken = new Set(kept.map((t) => t.id));
   const notes = [];
 
@@ -457,7 +459,7 @@ export function generateWeek({ weekStart, today, settings, focus, redos = [], ma
     if (keptFull) {
       fullTestDays.add(d);
       // A skipped full test has nothing to log, and its test stays unused for a later full-test day.
-      if (keptFull.status !== 'skipped' && keptFull.materialRef && !usedSources.has(keptFull.materialRef.sourceId)) {
+      if (keptFull.status !== 'skipped' && keptFull.status !== 'moved' && keptFull.materialRef && !usedSources.has(keptFull.materialRef.sourceId)) {
         logTaskFor.push({ date: d, sourceId: keptFull.materialRef.sourceId, title: keptFull.title });
       }
       continue;
@@ -613,6 +615,61 @@ export function generateWeek({ weekStart, today, settings, focus, redos = [], ma
 
 export function compareTasks(a, b) {
   return compareDates(a.date, b.date) || (a.slot ?? 0) - (b.slot ?? 0) || String(a.id).localeCompare(String(b.id));
+}
+
+// ---------------------------------------------------------------- reschedule
+
+/** Minutes still open on a date: study time minus tasks already there (moved-away tasks still count). */
+export function freeMinutes(date, tasks, settings) {
+  if (isNoStudyDay(date, settings)) return 0;
+  const used = tasks.filter((t) => t.date === date && !t.dropped).reduce((s, t) => s + (Number(t.minutes) || 0), 0);
+  return Math.max(0, dayCapacity(date, settings) - used);
+}
+
+/** Why a task can't go to `toDate`, or null if it can. */
+export function rescheduleProblem(task, toDate, today, settings) {
+  if (!task || (task.status !== 'todo' && task.status !== 'skipped')) return 'This task is already finished.';
+  if (compareDates(toDate, today) < 0) return 'Pick today or a later day.';
+  if (toDate === task.date) return 'Pick a different day.';
+  if (isNoStudyDay(toDate, settings)) return 'No studying is planned that day. Pick another day.';
+  if (task.type === 'full_test') {
+    const other = fullTestOn(settings, toDate);
+    if (other) return 'Another full test is already on that day.';
+  }
+  return null;
+}
+
+/**
+ * Move a todo or skipped task to another day.
+ * The original becomes `moved` (it keeps its time on the old day). A full test moves its full-test day
+ * in settings, and the planner builds it on the new date; any other task gets a pinned copy on the new
+ * date that regeneration leaves alone.
+ * Returns { original, copy, settingsPatch }.
+ */
+export function rescheduleTask(task, toDate, settings) {
+  const original = { ...task, status: 'moved', movedTo: toDate };
+  delete original.dropped;
+  if (task.type === 'full_test') {
+    const sourceId = task.materialRef ? task.materialRef.sourceId : null;
+    const fullTests = (settings.fullTests || []).filter((f) => f.date !== task.date);
+    fullTests.push({ date: toDate, sourceId });
+    fullTests.sort((a, b) => compareDates(a.date, b.date));
+    return { original, copy: null, settingsPatch: { fullTests } };
+  }
+  const copy = {
+    ...task,
+    id: `${task.id}-r-${toDate}`,
+    date: toDate,
+    weekStart: weekStartFor(toDate),
+    slot: 90,
+    status: 'todo',
+    origin: 'rescheduled',
+    pinned: true,
+    movedFrom: task.date,
+  };
+  delete copy.dropped;
+  delete copy.movedTo;
+  return { original, copy, settingsPatch: null };
 }
 
 // ---------------------------------------------------------------- heavy night

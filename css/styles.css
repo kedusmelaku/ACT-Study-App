@@ -563,3 +563,6 @@ summary { cursor: pointer; min-height: 32px; display: list-item; }
 
 .steps-list { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; font-size: 0.93rem; }
 .prompt-preview { white-space: pre-wrap; word-break: break-word; font-family: var(--mono); font-size: 0.78rem; background: var(--surface-2); padding: 10px 12px; border-radius: 10px; max-height: 240px; overflow: auto; margin: 8px 0 0; color: var(--muted); }
+
+.reschedule-btn { margin: 6px 0 -6px -10px; min-height: 36px; }
+.task-more-actions[hidden] { display: none; }

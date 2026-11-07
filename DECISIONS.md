@@ -88,3 +88,11 @@ Judgment calls made without asking. One line each: what, then why.
 - One `APP_PASSCODE` guards sync and the built-in Claude mode; no device-side encryption, at the user's request.
 - Sync runs on open, on returning to the app, when the connection comes back, 4 seconds after an edit, and every 3 minutes while the app is visible.
 - A skipped full test creates no "log the test" task, and its practice test stays unused so a full-test day added later picks it up automatically.
+
+## Reschedule
+- Any todo or skipped task can be rescheduled to today or a later day, never to the Thursday and Friday before a test or to test day.
+- Rescheduling a full test moves its full-test day in Settings, so the planner rebuilds it on the new date with the same practice test, even in a later week.
+- Any other task gets a pinned copy on the new day; pinned tasks survive plan regeneration like finished ones.
+- The day a task moved off keeps that time blocked, so the planner doesn't refill a night you just cleared.
+- Quick picks list the next study days that fit the task first, then ones that nearly fit, and say plainly when a day will run long; any date can still be picked.
+- Rescheduling has Undo, which restores the original task and the old full-test day.
