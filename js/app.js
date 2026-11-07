@@ -187,8 +187,17 @@ async function boot() {
   route();
 
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    // A page that was already controlled by a worker gets a new one only when an update is deployed.
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (hadController) showUpdateBanner();
+    });
     try {
-      await navigator.serviceWorker.register('/sw.js');
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      // Check for a new version whenever the app comes back to the foreground, not only on launch.
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update().catch(() => {});
+      });
     } catch (e) {
       console.error('Service worker registration failed', e);
     }
@@ -198,6 +207,28 @@ async function boot() {
   } catch (e) {
     console.warn(e);
   }
+}
+
+/** A small bar at the top: a new version is installed and takes effect on reload. */
+function showUpdateBanner() {
+  if (document.getElementById('update-bar')) return;
+  const bar = document.createElement('div');
+  bar.id = 'update-bar';
+  bar.className = 'update-bar';
+  bar.setAttribute('role', 'status');
+  setHTML(
+    bar,
+    html`<span class="grow">A new version is ready.</span>
+      <button type="button" class="btn btn-sm" data-update="reload">Reload</button>
+      <button type="button" class="icon-btn" data-update="later" aria-label="Later">${icon('x')}</button>`,
+  );
+  bar.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-update]');
+    if (!b) return;
+    if (b.dataset.update === 'reload') location.reload();
+    else bar.remove();
+  });
+  document.body.appendChild(bar);
 }
 
 window.addEventListener('error', (e) => console.error(e.error || e.message));

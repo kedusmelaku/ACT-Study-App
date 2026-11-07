@@ -570,3 +570,15 @@ summary { cursor: pointer; min-height: 32px; display: list-item; }
 
 .reschedule-btn { margin: 6px 0 -6px -10px; min-height: 36px; }
 .task-more-actions[hidden] { display: none; }
+
+/* Update-ready bar */
+.update-bar {
+  position: fixed; z-index: 60; left: 0; right: 0; margin: 0 auto;
+  top: calc(10px + env(safe-area-inset-top)); width: calc(100% - 24px); max-width: 520px;
+  display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 16px;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: 14px; box-shadow: var(--shadow-lg); font-size: 0.93rem; font-weight: 600;
+  animation: toast-in 0.25s var(--ease);
+}
+.update-bar .icon-btn { width: 40px; height: 40px; }
+@media (min-width: 900px) { .update-bar { left: 232px; } }

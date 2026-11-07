@@ -67,7 +67,7 @@ Tip: add `?today=2026-12-10` to the URL to see the app as it looks on another da
 
 Every push to a branch gets a preview URL, which is a good place to try Explain and Coach before production.
 
-When you change any file the app caches, bump `CACHE_VERSION` in `sw.js` so phones pick up the new version.
+When you change any file the app caches, bump `CACHE_VERSION` in `sw.js`. Installed copies download the new version in the background and show "A new version is ready" with a Reload button. Your data is untouched by updates.
 
 ## Environment variables
 

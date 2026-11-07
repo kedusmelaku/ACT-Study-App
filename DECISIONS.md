@@ -122,3 +122,4 @@ Judgment calls made without asking. One line each: what, then why.
 - An undone passage can be assigned again later; a passage marked done never is.
 - `npm run fuzz` runs the season simulation: 48 seasons across settings variants, checking determinism, week bounds, no-study days, capacity, material reuse, Science limits, redo intervals, and text output.
 - A skipped or moved task's Reschedule button stays at full strength (only the task content fades), and skipping or un-skipping a full test rebuilds the week so the "log the test" task appears or disappears right away.
+- When a new version finishes downloading, a bar says "A new version is ready" with Reload and Later; the app also checks for updates each time it returns to the foreground. It never reloads on its own, so nothing being typed is lost.
