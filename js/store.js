@@ -167,6 +167,8 @@ async function reloadFromDB() {
 
 /** Regenerate the current week. Done and skipped tasks are never rewritten. */
 export async function regenerate() {
+  // Data may have changed since the focus was last computed (a new test, misses, a sync), so recompute it.
+  cache.focus = null;
   const weekStart = currentWeekStart();
   const { tasks, notes } = generateWeek({
     weekStart,
@@ -578,8 +580,9 @@ export async function applySync(records, syncPatch, { forceSettings = null } = {
   ops.push({ store: 'settings', type: 'put', value: settings, fromSync: true });
   await db.batch(ops);
   await reloadFromDB();
-  const changed = puts.length > 0 || Object.keys(settingsPatch).length > 0;
-  if (changed && state.settings.onboarded) await regenerate();
+  // Always rebuild after a sync: the plan must match the merged data even when this pull was empty but an
+  // earlier one changed it. Unchanged tasks aren't rewritten, so this doesn't create new uploads.
+  if (state.settings.onboarded) await regenerate();
   emit();
   return { applied: puts.length + Object.keys(settingsPatch).length };
 }

@@ -78,6 +78,15 @@ class MaterialLedger {
     for (let p = 1; p <= n; p++) if (this.parts.has(`${m.sourceId}|${section}|${p}`)) return true;
     return false;
   }
+  /** The source takeSection would pick, skipping the first `skip` candidates, without reserving it. */
+  peekSection(section, skip = 0) {
+    let seen = 0;
+    for (const m of this.pool) {
+      if (!m.sections.includes(section) || this.touched(m, section)) continue;
+      if (seen++ === skip) return m;
+    }
+    return null;
+  }
   takeSection(section) {
     for (const m of this.pool) {
       if (!m.sections.includes(section) || this.touched(m, section)) continue;
@@ -510,6 +519,7 @@ export function generateWeek({ weekStart, today, settings, focus, redos = [], ma
   const dayNext = {}; // next slot index per date
   let taperSetPlaced = kept.some((t) => t.type === 'section_set' && t.origin === 'taper');
   let reviewIndex = 0;
+  let setsPlanned = 0;
 
   for (const d of futureDates) {
     dayNext[d] = 1;
@@ -571,7 +581,10 @@ export function generateWeek({ weekStart, today, settings, focus, redos = [], ma
     }
     if (cap < MIN_SLOT) continue;
     if (cap >= BLOCK_MIN) {
-      const setLen = Math.min(cap, minutesFor(topSection, SECTIONS[topSection].questions) + SET_REVIEW_MINUTES);
+      // Size the timed-section slot for the section it will actually get (legacy sections are longer).
+      const setSource = ledger.peekSection(topSection, setsPlanned++);
+      const setQuestions = setSource ? questionsFor(setSource, topSection) : SECTIONS[topSection].questions;
+      const setLen = Math.min(cap, minutesFor(topSection, setQuestions) + SET_REVIEW_MINUTES);
       drillSlots.push({ date: d, minutes: setLen, kind: 'set' });
       let rest = cap - setLen;
       if (rest >= MIN_SLOT) {
@@ -586,7 +599,9 @@ export function generateWeek({ weekStart, today, settings, focus, redos = [], ma
 
   // 3. Allocate drill slots to sections.
   const sci = focus.science;
-  const scienceEligible = !!sci && sci.recentMisses > 0;
+  // At most one Science slot a week, counting Science work already in the week.
+  const scienceThisWeek = kept.some((t) => t.section === 'science' && (t.type === 'drill' || t.type === 'section_set') && t.status !== 'moved');
+  const scienceEligible = !!sci && sci.recentMisses > 0 && !scienceThisWeek;
   const counts = allocateSlots(drillSlots.length, focus, scienceEligible);
   const order = [...focus.ranked.map((r) => r.section), 'science'];
   const assigned = new Array(drillSlots.length).fill(null);

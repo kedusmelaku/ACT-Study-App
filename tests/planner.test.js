@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateWeek, allocateSlots } from '../js/logic/planner.js';
 import { computeFocus } from '../js/logic/focus.js';
-import { weekDates } from '../js/logic/dates.js';
+import { weekDates, addDays } from '../js/logic/dates.js';
 import { settings as mkSettings, materials as mkMaterials, attempt, miss } from './helpers.js';
 
 const bench = attempt('bench', '2026-10-01', 'benchmark', { english: 35, math: 35, reading: 33, science: 35 }, 35);
@@ -159,4 +159,26 @@ test('rescheduling a full test moves its full-test day and the planner builds it
   assert.ok(!again.tasks.some((t) => t.type === 'log_test' && t.date === '2026-11-08'));
   assert.equal(rescheduleProblem(full, '2026-11-25', '2026-11-07', s), 'Another full test is already on that day.');
   assert.equal(rescheduleProblem(full, '2026-12-10', '2026-11-07', s), 'No studying is planned that day. Pick another day.');
+});
+
+test('a weekend block is sized for a longer legacy section, so the day is not overbooked', () => {
+  const s = mkSettings({ legacyTests: { 'legacy-1': { name: 'L1' } } });
+  const misses = [miss('math', 'Matrices', 'content', '2026-11-13'), miss('math', 'Vectors', 'content', '2026-11-13')];
+  const w = plan({ weekStart: '2026-11-14', today: '2026-11-14', misses, s, attempts: [attempt('b', '2026-10-01', 'benchmark', { english: 35, math: 33, reading: 35 }, 35)] });
+  const sat = w.tasks.filter((t) => t.date === '2026-11-14');
+  const set = sat.find((t) => t.type === 'section_set');
+  assert.equal(set.section, 'math');
+  assert.match(set.detail, /60 questions/);
+  assert.ok(sat.reduce((a, t) => a + t.minutes, 0) <= 150, 'Saturday fits its 150 minutes');
+});
+
+test('science stays at one slot a week even after an earlier science task is done', () => {
+  const misses = [miss('science', 'Graph reading', 'careless', '2026-11-13'), miss('science', 'Graph reading', 'careless', '2026-11-13')];
+  const first = plan({ weekStart: '2026-11-14', today: '2026-11-14', misses });
+  const tasks = first.tasks.map((t) => ({ ...t }));
+  const sci = tasks.find((t) => t.section === 'science');
+  assert.ok(sci);
+  sci.status = 'done';
+  const later = plan({ weekStart: '2026-11-14', today: addDays(sci.date, 1), existingTasks: tasks, misses: [...misses, miss('science', 'Graph reading', 'careless', addDays(sci.date, 1))] });
+  assert.equal(later.tasks.filter((t) => t.section === 'science' && t.status !== 'moved').length, 1);
 });

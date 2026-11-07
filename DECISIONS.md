@@ -113,3 +113,11 @@ Judgment calls made without asking. One line each: what, then why.
 - Edit stamps only move forward on each device, even if its clock is set back, so edits can't be stamped older than the last sync and skipped.
 - Open tabs tell each other when data changes and reload, so a stale tab can't overwrite newer data.
 - A test checks that every app file is in the service worker's offline list.
+
+## Second bug sweep (randomized seasons, browser seasons, two-device sync)
+- The plan rebuild recomputes the focus first; before, it reused a cached focus, so the plan built right after logging a test or misses used the old priorities.
+- A device rebuilds its plan after every sync, not only when that sync changed something, so two devices with the same data always show the same week.
+- Weekend blocks are sized for the section they'll actually hold; legacy sections are longer and used to overbook the day by 5 to 17 minutes.
+- The one-Science-slot-a-week limit counts Science work already done or kept that week.
+- An undone passage can be assigned again later; a passage marked done never is.
+- `npm run fuzz` runs the season simulation: 48 seasons across settings variants, checking determinism, week bounds, no-study days, capacity, material reuse, Science limits, redo intervals, and text output.
