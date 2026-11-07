@@ -78,3 +78,13 @@ test('weakness is each section\'s share of core weight', () => {
   assert.equal(f.bySection.english.weakness, 0.5);
   assert.equal(f.bySection.reading.weakness, 0);
 });
+
+test('focus sentence from misses also says how many points move the composite', () => {
+  const f = computeFocus({
+    attempts: [attempt('p', '2026-11-07', 'official_enhanced', { english: 34, math: 35, reading: 30 })],
+    misses: [miss('reading', 'Inference', 'trap', today), miss('reading', 'Inference', 'trap', today)],
+    today,
+  });
+  assert.equal(f.top, 'reading');
+  assert.match(f.sentence, /^Reading is your focus: most of your weighted misses are there, led by inference, mostly from trap answers\. Two more Reading points move your composite from 33 to 34\.$/);
+});

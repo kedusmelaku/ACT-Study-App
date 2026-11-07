@@ -32,12 +32,19 @@ export async function readJson(req, maxBytes = MAX_BODY_BYTES) {
   const declared = Number(req.headers && req.headers['content-length']);
   if (declared && declared > maxBytes) throw Object.assign(new Error('Body too large'), { status: 413 });
   let raw;
-  if (req.body !== undefined && req.body !== null) {
-    if (typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
-      if (Buffer.byteLength(JSON.stringify(req.body)) > maxBytes) throw Object.assign(new Error('Body too large'), { status: 413 });
-      return req.body;
+  let pre;
+  try {
+    // Vercel parses JSON lazily and throws on invalid JSON.
+    pre = req.body;
+  } catch {
+    throw Object.assign(new Error('Bad JSON'), { status: 400 });
+  }
+  if (pre !== undefined && pre !== null) {
+    if (typeof pre === 'object' && !Buffer.isBuffer(pre)) {
+      if (Buffer.byteLength(JSON.stringify(pre)) > maxBytes) throw Object.assign(new Error('Body too large'), { status: 413 });
+      return pre;
     }
-    raw = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : String(req.body);
+    raw = Buffer.isBuffer(pre) ? pre.toString('utf8') : String(pre);
   } else {
     const chunks = [];
     let size = 0;

@@ -59,3 +59,10 @@ Judgment calls made without asking. One line each: what, then why.
 - `scripts/dev-server.js` runs the app and API with plain Node as a fallback to `npx vercel dev`.
 - `.vercelignore` keeps CLAUDE.md, DECISIONS.md, tests, and scripts out of the deployment, since the spec contains personal details.
 - A strict Content-Security-Policy is set in `vercel.json`; inline styles are allowed for computed widths and colors, scripts are not.
+
+## Second pass
+- When the focus comes from misses rather than leverage, the sentence still says how many points move the composite, so both numbers behind the choice are visible.
+- Full-test details are built from the section constants in `js/data/act.js` instead of written-out minutes.
+- Editing a miss with no source keeps it as "Other" instead of quietly switching it to QuizMe.
+- The API body reader tolerates Vercel's lazy JSON parser throwing on invalid JSON and answers 400.
+- Added tests for import validation and for the escaping in `safe-html.js`.

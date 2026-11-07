@@ -112,7 +112,7 @@ export function render(el) {
             const e = (s.legacyTests || {})[id] || {};
             return html`<div class="stack-sm">
               <span class="label">Legacy test ${i + 1}${usedBySource[id] ? html` <span class="badge">${plural(usedBySource[id].size, 'section')} used</span>` : ''}</span>
-              <div class="grid-2">
+              <div class="stack-sm">
                 <input class="input" data-legacy="${id}" data-field="name" maxlength="60" value="${e.name || ''}" placeholder="Name, e.g. 2021-22 form">
                 <input class="input" data-legacy="${id}" data-field="url" type="url" maxlength="500" value="${e.url || ''}" placeholder="Link (optional)">
               </div></div>`;

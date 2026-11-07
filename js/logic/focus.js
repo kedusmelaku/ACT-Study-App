@@ -216,5 +216,10 @@ export function focusSentence(focus) {
   if (topTopic) parts.push(`most of your weighted misses are there, led by ${topTopic}`);
   else parts.push('it carries the most weight in your recent misses');
   if (sec.dominantCause) parts.push(`mostly from ${CAUSE_PHRASE[sec.dominantCause]}`);
-  return `${label} is your focus: ${parts.join(', ')}.`;
+  let out = `${label} is your focus: ${parts.join(', ')}.`;
+  if (comp !== null && pn !== null && Number.isFinite(pn)) {
+    const word = numberWord(pn);
+    out += ` ${word[0].toUpperCase()}${word.slice(1)} more ${label} point${pn === 1 ? ' moves' : 's move'} your composite from ${comp} to ${comp + 1}.`;
+  }
+  return out;
 }

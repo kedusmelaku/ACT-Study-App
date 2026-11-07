@@ -474,7 +474,7 @@ export function generateWeek({ weekStart, today, settings, focus, redos = [], ma
       section: null,
       type: 'full_test',
       title: `Full timed test: ${src.title}`,
-      detail: `All four sections, timed: English 35 min, Math 50, Reading 40, Science 40, with a 10 minute break after Math like test day. Use the PDF or the digital version. Then log it in Tests.`,
+      detail: `All four sections, timed: ${ALL_SECTIONS.map((s) => `${SECTIONS[s].label} ${SECTIONS[s].minutes} min`).join(', ')}, with a ${FULL_TEST_BREAK_MINUTES} minute break after Math like test day. Use the PDF or the digital version. Then log it in Tests.`,
       materialRef: { sourceId: src.sourceId, section: null },
       minutes: mins,
       fixed: true,

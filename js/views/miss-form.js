@@ -71,6 +71,8 @@ export function mountMissForm(root, { miss, onSubmit, submitLabel = 'Save miss',
     guessedRight: !!miss.guessedRight,
   };
   const mats = store.materials().filter((m) => m.available && m.kind !== 'book');
+  // An existing miss with no source shows "Other"; a new one defaults to QuizMe.
+  const initialSource = miss.id ? miss.sourceId || 'other' : miss.sourceId || 'act-hub';
 
   const draw = () => {
     const values = readText(root);
@@ -86,8 +88,8 @@ export function mountMissForm(root, { miss, onSubmit, submitLabel = 'Save miss',
           ? html`<div class="grid-2">
               <div class="field"><label for="mf-source">Source</label>
                 <select class="input" id="mf-source" name="sourceId">
-                  ${mats.map((m) => html`<option value="${m.sourceId}" ${(values.sourceId ?? miss.sourceId ?? 'act-hub') === m.sourceId ? html`selected` : ''}>${m.short || m.title}</option>`)}
-                  <option value="other" ${(values.sourceId ?? miss.sourceId) === 'other' ? html`selected` : ''}>Other</option>
+                  ${mats.map((m) => html`<option value="${m.sourceId}" ${(values.sourceId ?? initialSource) === m.sourceId ? html`selected` : ''}>${m.short || m.title}</option>`)}
+                  <option value="other" ${(values.sourceId ?? initialSource) === 'other' ? html`selected` : ''}>Other</option>
                 </select>
               </div>
               <div class="field"><label for="mf-q">Question #</label>
