@@ -456,7 +456,8 @@ export function generateWeek({ weekStart, today, settings, focus, redos = [], ma
     const keptFull = kept.find((t) => t.date === d && t.type === 'full_test');
     if (keptFull) {
       fullTestDays.add(d);
-      if (keptFull.materialRef && !usedSources.has(keptFull.materialRef.sourceId)) {
+      // A skipped full test has nothing to log, and its test stays unused for a later full-test day.
+      if (keptFull.status !== 'skipped' && keptFull.materialRef && !usedSources.has(keptFull.materialRef.sourceId)) {
         logTaskFor.push({ date: d, sourceId: keptFull.materialRef.sourceId, title: keptFull.title });
       }
       continue;

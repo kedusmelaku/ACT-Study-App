@@ -112,3 +112,18 @@ test('tasks stay inside the week', () => {
   const days = weekDates('2026-11-28');
   for (const t of w.tasks) assert.ok(days.includes(t.date));
 });
+
+test('a skipped full test adds no "log the test" task and stays available for a later full-test day', () => {
+  const first = plan({ weekStart: '2026-11-07', today: '2026-11-07' });
+  const tasks = first.tasks.map((t) => ({ ...t }));
+  const full = tasks.find((t) => t.type === 'full_test');
+  full.status = 'skipped';
+  const again = plan({ weekStart: '2026-11-07', today: '2026-11-07', existingTasks: tasks });
+  assert.ok(!again.tasks.some((t) => t.type === 'log_test'));
+  assert.equal(again.tasks.find((t) => t.id === full.id).status, 'skipped');
+  // Adding a new full-test day picks the unused Practice Test 1 again.
+  const s = mkSettings({ fullTests: [...mkSettings().fullTests, { date: '2026-11-08', sourceId: 'enhanced-1' }], availability: { ...mkSettings().availability, 0: 180 } });
+  const moved = plan({ weekStart: '2026-11-07', today: '2026-11-07', existingTasks: tasks, s });
+  const sunday = moved.tasks.find((t) => t.date === '2026-11-08' && t.type === 'full_test');
+  assert.equal(sunday.materialRef.sourceId, 'enhanced-1');
+});

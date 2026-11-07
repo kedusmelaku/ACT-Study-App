@@ -87,3 +87,4 @@ Judgment calls made without asking. One line each: what, then why.
 - A one-time upgrade stamps data saved before sync existed, so a device's existing log uploads on its first sync, and its settings outrank a brand-new device's defaults.
 - One `APP_PASSCODE` guards sync and the built-in Claude mode; no device-side encryption, at the user's request.
 - Sync runs on open, on returning to the app, when the connection comes back, 4 seconds after an edit, and every 3 minutes while the app is visible.
+- A skipped full test creates no "log the test" task, and its practice test stays unused so a full-test day added later picks it up automatically.
