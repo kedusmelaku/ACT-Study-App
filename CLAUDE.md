@@ -66,7 +66,7 @@ Put all of these values in `js/data/act.js` as constants. Nothing else should ha
   - Never assign interpolated data to `innerHTML`.
   - Attach event handlers with `data-*` attributes plus `addEventListener`, never inline handlers.
 - **Errors:** show the user plain-language messages only ("Couldn't reach Claude. Check your connection and try again."). Never show stack traces, status codes, or raw error text. Log the details to the console.
-- **No mock data outside demo mode** (see Phase 3). Empty states show helpful prompts, not fake rows.
+- **No mock data.** Empty states show helpful prompts, not fake rows.
 - **UI copy:** no em dashes. Use commas or periods instead.
 - **Theme:** light and dark mode, following the system setting through `prefers-color-scheme`. All colors come from CSS variables.
 - **Validation:** run `node --check` on every JS file after each phase. Keep the logic modules (`js/logic/*`) pure, with no DOM and no IndexedDB, so they can be tested with `node --test`.
@@ -104,7 +104,7 @@ README.md
 
 ## 5. Data model (IndexedDB stores)
 
-- **settings** (single record): test date(s), study days and slot lengths, busy dates, timezone, passcode for the Claude features, last backup date, `demoMode` flag.
+- **settings** (single record): test date(s), study days and slot lengths, busy dates, timezone, passcode for the Claude features, last backup date.
 - **attempts:** one record per test taken.
   - `{ id, date, kind: "real" | "official_enhanced" | "official_legacy" | "benchmark" | "other", sourceId, scores: { english, math, reading, science? }, scale: 36 | 35, notes }`
 - **pacing:** one record per section of an attempt.
@@ -266,7 +266,7 @@ Its output is a ranked list of sections with a priority score, plus the ranked t
 - **Plan:** the week view, with tasks by day.
 - **Log:** the error log.
 - **Tests:** a list of attempts, plus "Add test".
-- **Settings:** dates, slots, materials, export/import, and (in Phase 3) the passcode and demo mode.
+- **Settings:** dates, slots, materials, export/import, and (in Phase 3) the passcode.
 - Navigation is a bottom tab bar: Today, Plan, Log, Tests, More (the More tab holds Redo, Explain, Progress, and Settings as they're added).
 
 **Phase 1 done when:** he can enter a test with tagged misses, see the composite and focus, get a generated week plan, check off tasks, and export his data. Install works on Android. All JS passes `node --check`. The scoring, focus, and planner tests pass.
@@ -314,7 +314,7 @@ Its output is a ranked list of sections with a priority score, plus the ranked t
 
 ---
 
-## 11. Phase 3: Progress, superscore, Claude connection, demo mode
+## 11. Phase 3: Progress, superscore, Claude connection
 
 ### 11.1 Progress
 - A trend chart of section scores across attempts, drawn as hand-written inline SVG with no chart library, so it works offline.
@@ -391,20 +391,14 @@ Check the current Anthropic API docs (https://docs.claude.com/en/api/overview) f
 - **Advisory only:** the deterministic planner stays in charge. If the suggestion maps to a setting (for example, "add a Sunday slot"), show an "Apply" button that changes that setting. Otherwise it's just text.
 - **Availability:** the note can be requested once per week from Progress. Save it in `coachNotes`.
 
-### 11.4 Demo mode
-- A toggle in Settings that loads clearly labeled sample data into a **separate** IndexedDB database.
-- A persistent "Demo mode" banner shows while it's on.
-- Turning it off returns to his real data untouched.
-- Sample data never mixes with real data.
-
-### 11.5 Polish
+### 11.4 Polish
 - Empty states for every screen.
 - Loading states for the Claude calls.
 - Undo for deletes, shown as a toast.
 - Large tap targets.
 - Respect reduced motion.
 
-**Phase 3 done when:** the trend chart and superscore render from real attempts, Explain and Coach work end to end on a Vercel preview, unauthorized requests are rejected, the app works offline apart from the Claude features, and demo mode is fully isolated.
+**Phase 3 done when:** the trend chart and superscore render from real attempts, Explain and Coach work end to end on a Vercel preview, unauthorized requests are rejected, and the app works offline apart from the Claude features.
 
 ---
 

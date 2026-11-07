@@ -1,0 +1,27 @@
+// Runs `node --check` on every JS file in the project.
+import { readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+
+const skip = new Set(['node_modules', '.git', '.vercel']);
+const files = [];
+(function walk(dir) {
+  for (const name of readdirSync(dir)) {
+    if (skip.has(name)) continue;
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) walk(p);
+    else if (name.endsWith('.js')) files.push(p);
+  }
+})('.');
+
+let failed = 0;
+for (const f of files) {
+  try {
+    execFileSync(process.execPath, ['--check', f], { stdio: 'pipe' });
+  } catch (e) {
+    failed++;
+    console.error(`FAIL ${f}\n${e.stderr}`);
+  }
+}
+console.log(`${files.length - failed}/${files.length} files pass node --check`);
+process.exit(failed ? 1 : 0);
