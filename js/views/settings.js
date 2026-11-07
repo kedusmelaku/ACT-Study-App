@@ -152,12 +152,25 @@ export function render(el) {
 
       <section class="stack" id="claude">
         <div class="section-title"><h2>Claude</h2></div>
-        <form class="card stack" data-passcode-form>
-          <div class="field"><label for="passcode">App passcode</label>
-            <input class="input" id="passcode" name="passcode" type="password" autocomplete="current-password" maxlength="200" value="${s.passcode || ''}" placeholder="The APP_PASSCODE you set in Vercel"></div>
-          <p class="hint">Stored only on this device and sent with Explain and Coach requests.</p>
-          <button class="btn btn-secondary" type="submit">Save passcode</button>
-        </form>
+        <div class="card stack">
+          <div class="field"><span class="label">How Explain and Coach reach Claude</span>
+            <div class="seg" role="group" aria-label="Claude mode">
+              <button type="button" data-claude-mode="chat" aria-pressed="${s.claudeMode !== 'api'}">My Claude chat</button>
+              <button type="button" data-claude-mode="api" aria-pressed="${s.claudeMode === 'api'}">Built-in (API)</button>
+            </div>
+          </div>
+          ${s.claudeMode === 'api'
+            ? html`<p class="small muted">The app calls Claude for you through your Vercel deployment. Uses paid API credits from the Anthropic Console.</p>`
+            : html`<p class="small muted">Free with your Claude plan. The app copies a ready-made prompt, you paste it into Claude, then paste the reply back. Nothing is sent from the app.</p>`}
+        </div>
+        ${s.claudeMode === 'api'
+          ? html`<form class="card stack" data-passcode-form>
+              <div class="field"><label for="passcode">App passcode</label>
+                <input class="input" id="passcode" name="passcode" type="password" autocomplete="current-password" maxlength="200" value="${s.passcode || ''}" placeholder="The APP_PASSCODE you set in Vercel"></div>
+              <p class="hint">Stored only on this device and sent with Explain and Coach requests.</p>
+              <button class="btn btn-secondary" type="submit">Save passcode</button>
+            </form>`
+          : ''}
       </section>
 
       <section class="stack" id="backup">
@@ -235,6 +248,11 @@ function bind(el) {
       const cur = Number(s.availability[d]) || 0;
       const next = Math.max(0, Math.min(300, cur + dir * STEP));
       return save({ availability: { ...s.availability, [d]: next } });
+    }
+    const cm = e.target.closest('[data-claude-mode]');
+    if (cm) {
+      if (cm.dataset.claudeMode === s.claudeMode || (cm.dataset.claudeMode === 'chat' && s.claudeMode !== 'api')) return;
+      return save({ claudeMode: cm.dataset.claudeMode }, false, cm.dataset.claudeMode === 'api' ? 'Built-in mode on. Add your passcode below.' : 'Using your Claude chat. No API key needed.');
     }
     const gc = e.target.closest('[data-guide-count]');
     if (gc) {

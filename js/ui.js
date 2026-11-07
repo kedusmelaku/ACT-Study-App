@@ -180,3 +180,54 @@ export function fmtMinutes(m) {
   }
   return `${m} min`;
 }
+
+/** Copy text to the clipboard. Returns true on success. */
+export async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (e) {
+    console.warn('Clipboard API failed, trying fallback', e);
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  } catch (e) {
+    console.error(e);
+    return false;
+  }
+}
+
+export const CLAUDE_CHAT_URL = 'https://claude.ai/new';
+
+/**
+ * The "paste into Claude" panel used by Explain and Coach in chat mode.
+ * prompt: the text to copy. replyLabel: what the paste box is for.
+ */
+export function chatPanel({ prompt, title, steps, replyLabel, submitLabel, reply = '' }) {
+  return html`<section class="card stack" data-chat-panel>
+    <div class="row">${icon('sparkle')}<h2 class="grow">${title}</h2></div>
+    <ol class="steps-list">${steps.map((s) => html`<li>${s}</li>`)}</ol>
+    <div class="fab-row">
+      <button type="button" class="btn btn-secondary" data-action="copy-prompt">${icon('tests')}Copy again</button>
+      <a class="btn" href="${CLAUDE_CHAT_URL}" target="_blank" rel="noopener">${icon('link')}Open Claude</a>
+    </div>
+    <details><summary class="small strong">See the prompt</summary><pre class="prompt-preview">${prompt}</pre></details>
+    <div class="field"><label for="chat-reply">${replyLabel}</label>
+      <textarea class="input" id="chat-reply" name="chatReply" rows="6" maxlength="20000" placeholder="Long-press, then Paste">${reply}</textarea></div>
+    <div class="fab-row">
+      <button type="button" class="btn btn-ghost" data-action="cancel-chat">Cancel</button>
+      <button type="button" class="btn" data-action="read-reply">${submitLabel}</button>
+    </div>
+  </section>`;
+}

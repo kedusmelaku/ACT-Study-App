@@ -66,3 +66,11 @@ Judgment calls made without asking. One line each: what, then why.
 - Editing a miss with no source keeps it as "Other" instead of quietly switching it to QuizMe.
 - The API body reader tolerates Vercel's lazy JSON parser throwing on invalid JSON and answers 400.
 - Added tests for import validation and for the escaping in `safe-html.js`.
+
+## Free Claude chat mode
+- Explain and Coach default to a copy-to-chat mode so they work with a Claude Pro plan and no API credits; the built-in API mode stays as a Settings switch.
+- Both modes build their prompts from one module, `js/logic/claude-format.js`, which the `/api` routes also import, so the tutor instructions and the reply parsing never drift apart.
+- The chat prompt asks for a JSON code block; the app reads the first fenced block, or any JSON object in the reply, and falls back to saving the reply as plain text.
+- In chat mode the photo goes straight into the Claude chat, so the app never handles it; a switch adds "a photo is attached" to the prompt.
+- "Open Claude" links to claude.ai/new; on Android, Chrome may hand it to the Claude app if installed.
+- The coach is still one note per week in chat mode, and the Apply button only appears when the pasted reply has a valid weekday setting.

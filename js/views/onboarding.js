@@ -79,7 +79,7 @@ export function render(el, ctx) {
     </div>
     <div class="card card-soft stack-sm">
       <div class="row">${icon('shield')}<h3>Claude features</h3></div>
-      <p class="small muted">Explain and Coach need the passcode you set in Vercel. Add it in Settings whenever you're ready.</p>
+      <p class="small muted">Explain and Coach work through your own Claude chat for free: the app copies a ready-made prompt, you paste Claude's reply back.</p>
     </div>
     <div class="sticky-actions"><button class="btn btn-secondary" data-action="back">Back</button><button class="btn" data-action="finish">Build my plan</button></div>
   </div>`;

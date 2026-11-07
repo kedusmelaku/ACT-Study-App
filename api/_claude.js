@@ -45,25 +45,5 @@ export async function callClaude({ system, content, maxTokens, fetchImpl = globa
   return text;
 }
 
-/** Strip ``` fences and parse JSON. Returns null when it isn't valid JSON. */
-export function parseJsonReply(text) {
-  let t = String(text || '').trim();
-  const fence = t.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-  if (fence) t = fence[1].trim();
-  if (!t.startsWith('{')) {
-    const start = t.indexOf('{');
-    const end = t.lastIndexOf('}');
-    if (start === -1 || end <= start) return null;
-    t = t.slice(start, end + 1);
-  }
-  try {
-    const v = JSON.parse(t);
-    return v && typeof v === 'object' && !Array.isArray(v) ? v : null;
-  } catch {
-    return null;
-  }
-}
-
-export function clip(v, n) {
-  return typeof v === 'string' ? v.slice(0, n) : '';
-}
+// Reply parsing is shared with the browser's copy-to-chat mode.
+export { parseJsonReply, clip } from '../js/logic/claude-format.js';

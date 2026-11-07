@@ -7,7 +7,16 @@ It is not a question bank. Official ACT materials are the practice source. The a
 - Plain HTML, CSS, and JS (ES modules). No framework, no build step.
 - Installable PWA that works offline (except the Claude features).
 - Data lives on your device in IndexedDB. Export a backup from Settings.
-- The only server code is a small Claude proxy in `/api`, so the API key never reaches the browser.
+- Explain and Coach work for free through your own Claude chat (claude.ai or the Claude app): the app copies a ready-made prompt, you paste Claude's reply back. No API key needed.
+- An optional built-in mode calls Claude for you through a small proxy in `/api`, so the API key never reaches the browser. It uses paid API credits.
+
+## Using Claude for free (default)
+
+1. On a miss, tap **Explain**, fill in what you remember, and tap **Copy prompt for Claude**.
+2. Tap **Open Claude**, start a new chat, paste, and send. Attach your photo of the question there if you have one.
+3. Copy Claude's whole reply, paste it back into the app, and tap **Read reply**. Then save it to the miss.
+
+The weekly coach on Progress works the same way. Its prompt holds only your numbers, never questions or notes. Switch modes in Settings, under Claude.
 
 ## Run it locally
 
@@ -45,9 +54,9 @@ Every push to a branch gets a preview URL, which is a good place to try Explain 
 
 When you change any file the app caches, bump `CACHE_VERSION` in `sw.js` so phones pick up the new version.
 
-## Environment variables
+## Environment variables (built-in mode only)
 
-Set these in Vercel. Never commit them.
+Only needed if you switch Settings to **Built-in (API)**. Set these in Vercel. Never commit them.
 
 | Name | What it is |
 |---|---|

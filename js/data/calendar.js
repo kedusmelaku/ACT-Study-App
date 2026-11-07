@@ -78,6 +78,8 @@ export function defaultSettings() {
         return '';
       }
     })(),
+    // 'chat': copy prompts into your own Claude chat (free with a Claude plan). 'api': built-in, needs an API key.
+    claudeMode: 'chat',
     passcode: '',
     lastBackup: null,
     legacyTests: {},

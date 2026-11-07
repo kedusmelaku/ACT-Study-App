@@ -1,7 +1,10 @@
-// Explain my miss: ask Claude why the right answer is right. Photos are resized on the device and never stored.
+// Explain my miss: ask Claude why the right answer is right.
+// Chat mode (default, free): copy a prompt into your own Claude chat and paste the reply back.
+// API mode: the app calls /api/explain. Photos are resized on the device and never stored.
 import { html, setHTML } from '../safe-html.js';
 import * as store from '../store.js';
-import { icon, topbar, notice, toast, reportError, openSheet, confirmSheet } from '../ui.js';
+import { icon, topbar, notice, toast, reportError, openSheet, confirmSheet, copyText, chatPanel } from '../ui.js';
+import { explainChatPrompt, parseJsonReply, normalizeExplain } from '../logic/claude-format.js';
 import { ALL_SECTIONS, SECTIONS, CAUSES } from '../data/act.js';
 import { topicsFor } from '../data/topics.js';
 import { mountMissForm } from './miss-form.js';
@@ -15,12 +18,19 @@ let form = null;
 let result = null;
 let loading = false;
 let formKey = null;
+// Chat mode: the copied prompt and the reply being pasted, or null when no prompt is out.
+let chat = null;
+
+function chatMode() {
+  return store.state.settings.claudeMode !== 'api';
+}
 
 function initForm(query) {
   const key = query.miss || 'new';
   if (form && formKey === key) return;
   formKey = key;
   result = null;
+  chat = null;
   const m = query.miss ? store.state.misses.find((x) => x.id === query.miss) : null;
   form = {
     missId: m ? m.id : null,
@@ -30,14 +40,17 @@ function initForm(query) {
     myAnswer: m ? m.myAnswer : '',
     correctAnswer: m ? m.correctAnswer : '',
     myReasoning: '',
-    image: null, // { mediaType, data, preview }
+    image: null, // { mediaType, data, preview }, API mode only
+    photoInChat: false, // chat mode: he'll attach the photo in Claude himself
   };
 }
 
 export function render(el, ctx) {
   initForm(ctx.query);
   const online = navigator.onLine !== false;
+  const useChat = chatMode();
   const passcode = store.state.settings.passcode;
+  const canSubmit = useChat || (online && passcode && !loading);
   const miss = form.missId ? store.state.misses.find((x) => x.id === form.missId) : null;
   const topics = topicsFor(form.section, store.state.settings.customTopics);
 
@@ -45,8 +58,23 @@ export function render(el, ctx) {
     el,
     html`${topbar('Explain a miss', { back: miss ? `#/log/${miss.id}` : '#/more', eyebrow: miss ? `${SECTIONS[miss.section].label}, ${miss.topic || 'untagged'}` : 'Powered by Claude' })}
     <div class="stack-lg">
-      ${!online ? notice('warn', "Explain needs internet. Your miss is saved, try again when you're online.") : ''}
-      ${online && !passcode ? notice('info', html`Add your app passcode in <a href="#/settings">Settings</a> to use Explain.`) : ''}
+      ${!useChat && !online ? notice('warn', "Explain needs internet. Your miss is saved, try again when you're online.") : ''}
+      ${!useChat && online && !passcode ? notice('info', html`Add your app passcode in <a href="#/settings">Settings</a> to use Explain.`) : ''}
+      ${useChat && !chat && !result ? notice('info', html`Free with your Claude plan: fill this in, copy the prompt into Claude, then paste the reply back here. <a href="#/settings">Change mode</a>`) : ''}
+      ${chat
+        ? chatPanel({
+            prompt: chat.prompt,
+            title: 'Ask Claude',
+            steps: [
+              'The prompt is copied. Tap Open Claude and start a new chat.',
+              form.photoInChat ? 'Paste the prompt and attach your photo of the question, then send.' : 'Paste the prompt and send it.',
+              "Copy Claude's whole reply, paste it below, and tap Read reply.",
+            ],
+            replyLabel: "Claude's reply",
+            submitLabel: 'Read reply',
+            reply: chat.reply,
+          })
+        : ''}
       ${result ? resultCard(miss) : ''}
       <form class="stack-lg" data-explain-form novalidate>
         <div class="field"><span class="label">Section</span>
@@ -60,12 +88,15 @@ export function render(el, ctx) {
         <div class="field"><label for="ex-desc">Describe the question</label>
           <textarea class="input" id="ex-desc" name="description" maxlength="3000" placeholder="Paste or summarize the question and the answer choices. Or attach a photo below.">${form.description}</textarea>
         </div>
-        <div class="field"><span class="label">Photo of the question (optional)</span>
+        ${useChat
+          ? html`<label class="check-row"><span class="grow"><span class="strong">I'll attach a photo in Claude</span><br><span class="small muted">Photos from your own practice test go straight into the Claude chat, not through the app.</span></span>
+              <span class="switch"><input type="checkbox" name="photoInChat" ${form.photoInChat ? html`checked` : ''}><span></span></span></label>`
+          : html`<div class="field"><span class="label">Photo of the question (optional)</span>
           ${form.image
             ? html`<div class="stack-sm"><img class="preview-img" src="${form.image.preview}" alt="Question photo preview"><button type="button" class="btn btn-secondary btn-sm" data-action="remove-photo">${icon('trash')}Remove photo</button></div>`
             : html`<label class="btn btn-secondary">${icon('camera')}Add a photo<input type="file" accept="image/*" capture="environment" data-photo hidden></label>`}
           <span class="hint">Only from your own practice test. Sent for this explanation and never stored.</span>
-        </div>
+        </div>`}
         <div class="grid-2">
           <div class="field"><label for="ex-my">My answer</label><input class="input" id="ex-my" name="myAnswer" maxlength="200" value="${form.myAnswer}"></div>
           <div class="field"><label for="ex-key">Correct answer</label><input class="input" id="ex-key" name="correctAnswer" maxlength="200" value="${form.correctAnswer}"></div>
@@ -74,8 +105,8 @@ export function render(el, ctx) {
           <textarea class="input" id="ex-why" name="myReasoning" maxlength="1500" placeholder="Helps Claude name what tempted you.">${form.myReasoning}</textarea></div>
         <p class="error-text" data-error hidden></p>
         <div class="sticky-actions">
-          <button class="btn" type="submit" ${!online || !passcode || loading ? html`disabled` : ''}>
-            ${loading ? html`<span class="spinner" aria-hidden="true"></span>Explaining` : html`${icon('explain')}Explain it`}
+          <button class="btn" type="submit" ${canSubmit ? '' : html`disabled`}>
+            ${loading ? html`<span class="spinner" aria-hidden="true"></span>Explaining` : useChat ? html`${icon('tests')}${chat ? 'Copy a new prompt' : 'Copy prompt for Claude'}` : html`${icon('explain')}Explain it`}
           </button>
         </div>
       </form>
@@ -84,11 +115,13 @@ export function render(el, ctx) {
 
   const root = el;
   root.addEventListener('input', (e) => {
+    if (e.target.name === 'chatReply' && chat) chat.reply = e.target.value;
     const n = e.target.name;
     if (n && n in form) form[n] = e.target.value;
   });
   root.addEventListener('change', async (e) => {
     if (e.target.name === 'topic') form.topic = e.target.value;
+    if (e.target.name === 'photoInChat') form.photoInChat = e.target.checked;
     if (e.target.hasAttribute('data-photo')) {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
@@ -113,6 +146,24 @@ export function render(el, ctx) {
     if (a.dataset.action === 'remove-photo') {
       form.image = null;
       rerender(el, ctx);
+    } else if (a.dataset.action === 'copy-prompt') {
+      const ok = await copyText(chat.prompt);
+      toast(ok ? 'Prompt copied.' : "Couldn't copy. Open See the prompt and copy it by hand.");
+    } else if (a.dataset.action === 'cancel-chat') {
+      chat = null;
+      rerender(el, ctx);
+    } else if (a.dataset.action === 'read-reply') {
+      const text = (root.querySelector('[name=chatReply]') || {}).value || '';
+      if (!text.trim()) {
+        toast("Paste Claude's reply first.");
+        return;
+      }
+      const parsed = parseJsonReply(text);
+      result = normalizeExplain(parsed, text);
+      chat = null;
+      if (!parsed) toast("Couldn't find the structured part, so the reply is saved as plain text.");
+      rerender(el, ctx);
+      window.scrollTo(0, 0);
     } else if (a.dataset.action === 'update-miss') {
       await updateMiss(miss, ctx);
     } else if (a.dataset.action === 'save-new') {
@@ -122,9 +173,30 @@ export function render(el, ctx) {
   root.addEventListener('submit', async (e) => {
     e.preventDefault();
     const err = root.querySelector('[data-error]');
-    if (!form.description.trim() && !form.image) {
+    const hasPhoto = chatMode() ? form.photoInChat : !!form.image;
+    if (!form.description.trim() && !hasPhoto) {
       err.textContent = 'Describe the question or attach a photo.';
       err.hidden = false;
+      return;
+    }
+    if (chatMode()) {
+      const prompt = explainChatPrompt(
+        {
+          section: form.section,
+          topic: form.topic,
+          description: form.description.trim(),
+          myAnswer: form.myAnswer.trim(),
+          correctAnswer: form.correctAnswer.trim(),
+          myReasoning: form.myReasoning.trim(),
+        },
+        { photo: form.photoInChat },
+      );
+      const ok = await copyText(prompt);
+      chat = { prompt, reply: '' };
+      result = null;
+      toast(ok ? 'Prompt copied. Paste it into Claude.' : "Couldn't copy. Open See the prompt and copy it by hand.");
+      rerender(el, ctx);
+      window.scrollTo(0, 0);
       return;
     }
     loading = true;
@@ -256,6 +328,7 @@ async function saveNew(ctx) {
     form = null;
     formKey = null;
     result = null;
+    chat = null;
     ctx.navigate(`#/log/${saved}`);
   }
 }

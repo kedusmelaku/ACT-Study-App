@@ -1,7 +1,8 @@
 // Progress: trend chart, superscore, top topics, why you miss, and the weekly coach.
 import { html, setHTML } from '../safe-html.js';
 import * as store from '../store.js';
-import { icon, topbar, emptyState, plural, toast, notice } from '../ui.js';
+import { icon, topbar, emptyState, plural, toast, notice, copyText, chatPanel } from '../ui.js';
+import { coachChatPrompt, parseJsonReply, normalizeCoach } from '../logic/claude-format.js';
 import { ALL_SECTIONS, SECTIONS, CAUSES, CAUSE_KEYS } from '../data/act.js';
 import { DAY_NAMES } from '../data/calendar.js';
 import { superscore } from '../logic/scoring.js';
@@ -13,6 +14,8 @@ import { postClaude } from './explain.js';
 export const live = true;
 
 let coachLoading = false;
+// Chat mode: { weekStart, prompt, reply } while a coach prompt is out.
+let coachChat = null;
 
 function causeTracker(split, focus) {
   const reading = split.reading;
@@ -101,14 +104,26 @@ function coachCard() {
       ${sug ? html`<div class="card card-accent card-tight stack-sm"><div class="tiny strong muted">AN OPTION</div><p class="small">${sug.text}</p>
         ${setting ? html`<button class="btn btn-sm ${applied ? 'btn-secondary' : ''}" data-action="apply" ${applied ? html`disabled` : ''}>${applied ? 'Applied' : `Apply: ${DAY_NAMES[setting.day]} ${setting.minutes ? `${setting.minutes} min` : 'off'}`}</button>` : ''}</div>` : ''}
       <p class="hint">Saved ${formatDate(dateOf(note.createdAt))}. The plan stays in charge; this note is advice. Next note available next week.</p>`;
+  } else if (coachChat && coachChat.weekStart === ws) {
+    return chatPanel({
+      prompt: coachChat.prompt,
+      title: 'Weekly coach',
+      steps: ['The prompt is copied. Tap Open Claude and start a new chat.', 'Paste it and send.', "Copy Claude's whole reply, paste it below, and tap Save note."],
+      replyLabel: "Claude's reply",
+      submitLabel: 'Save note',
+      reply: coachChat.reply,
+    });
   } else if (coachLoading) {
     body = html`<div class="stack-sm" aria-busy="true"><div class="row"><span class="spinner"></span><span class="muted small">Reading your week</span></div>
       <div class="skeleton"></div><div class="skeleton" style="width:80%"></div><div class="skeleton" style="width:60%"></div></div>`;
   } else {
+    const useChat = s.settings.claudeMode !== 'api';
+    const disabled = !useChat && (!online || !s.settings.passcode);
     body = html`<p class="small muted">A short note on your week from Claude, built only from your numbers. One per week.</p>
-      ${!online ? notice('warn', 'Coach needs internet. Try again when you are online.') : ''}
-      ${online && !s.settings.passcode ? notice('info', html`Add your app passcode in <a href="#/settings">Settings</a> first.`) : ''}
-      <button class="btn" data-action="coach" ${!online || !s.settings.passcode ? html`disabled` : ''}>${icon('sparkle')}Get this week's note</button>
+      ${!useChat && !online ? notice('warn', 'Coach needs internet. Try again when you are online.') : ''}
+      ${!useChat && online && !s.settings.passcode ? notice('info', html`Add your app passcode in <a href="#/settings">Settings</a> first.`) : ''}
+      <button class="btn" data-action="coach" ${disabled ? html`disabled` : ''}>${icon(useChat ? 'tests' : 'sparkle')}${useChat ? "Copy this week's coach prompt" : "Get this week's note"}</button>
+      ${useChat ? html`<p class="hint">Only your numbers go into the prompt: estimates, topic weights, cause counts, redo and completion stats. No questions or notes.</p>` : ''}
       ${older ? html`<details><summary class="small strong">Last note (${formatDate(older.weekStart, { weekday: false })})</summary><p class="small mt">${older.text}</p></details>` : ''}`;
   }
   return html`<section class="card stack"><div class="row">${icon('sparkle')}<h2 class="grow">Weekly coach</h2></div>${body}</section>`;
@@ -152,10 +167,22 @@ export function render(el) {
 
   if (chart) bindChart(el, series, chart.width);
 
+  el.addEventListener('input', (e) => {
+    if (e.target.name === 'chatReply' && coachChat) coachChat.reply = e.target.value;
+  });
   el.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-action]');
     if (!b) return;
     if (b.dataset.action === 'coach') await requestCoach();
+    if (b.dataset.action === 'copy-prompt' && coachChat) {
+      const ok = await copyText(coachChat.prompt);
+      toast(ok ? 'Prompt copied.' : "Couldn't copy. Open See the prompt and copy it by hand.");
+    }
+    if (b.dataset.action === 'cancel-chat') {
+      coachChat = null;
+      rerenderNow();
+    }
+    if (b.dataset.action === 'read-reply') await saveChatReply(el);
     if (b.dataset.action === 'apply') await applySuggestion();
   });
 }
@@ -205,6 +232,15 @@ async function requestCoach() {
   const s = store.state;
   const ws = store.currentWeekStart();
   if (s.coachNotes.some((n) => n.weekStart === ws)) return;
+  if (s.settings.claudeMode !== 'api') {
+    const stats = coachStats({ settings: s.settings, attempts: s.attempts, misses: s.misses, redos: s.redos, pacing: s.pacing, tasks: s.tasks, today: store.today() });
+    const prompt = coachChatPrompt(stats);
+    const ok = await copyText(prompt);
+    coachChat = { weekStart: ws, prompt, reply: '' };
+    toast(ok ? 'Prompt copied. Paste it into Claude.' : "Couldn't copy. Open See the prompt and copy it by hand.");
+    rerenderNow();
+    return;
+  }
   coachLoading = true;
   rerenderNow();
   try {
@@ -217,6 +253,25 @@ async function requestCoach() {
     console.error(err);
     toast(err.userMessage || "Couldn't reach Claude. Check your connection and try again.");
     rerenderNow();
+  }
+}
+
+async function saveChatReply(el) {
+  const text = (el.querySelector('[name=chatReply]') || {}).value || (coachChat ? coachChat.reply : '');
+  if (!text.trim()) {
+    toast("Paste Claude's reply first.");
+    return;
+  }
+  const parsed = parseJsonReply(text);
+  const r = normalizeCoach(parsed, text);
+  try {
+    const ws = store.currentWeekStart();
+    coachChat = null;
+    await store.saveCoachNote({ weekStart: ws, text: r.note, suggestion: r.suggestion, createdAt: store.nowISO() });
+    toast(parsed ? 'Coach note saved.' : 'Saved as plain text. No Apply button this time.');
+  } catch (err) {
+    console.error(err);
+    toast("Couldn't save the note. Try again.");
   }
 }
 
