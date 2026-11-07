@@ -245,7 +245,9 @@ function setTaskFor(section, ledger, ctx, origin) {
       origin,
     };
   }
-  const q = Math.max(10, Math.round((ctx.minutes - SET_REVIEW_MINUTES) * 60 / SECTIONS[section].pace));
+  // No full section left: a QuizMe set as close to a real section as the time allows.
+  const fit = Math.floor(((ctx.minutes - SET_REVIEW_MINUTES) * 60) / SECTIONS[section].pace);
+  const q = Math.max(10, Math.min(SECTIONS[section].questions, fit));
   const mins = minutesFor(section, q);
   return {
     section,

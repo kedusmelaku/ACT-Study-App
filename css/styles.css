@@ -93,6 +93,7 @@ p { margin: 0; }
 a { color: var(--accent); text-underline-offset: 2px; }
 button, input, select, textarea { font: inherit; color: inherit; }
 img, svg { display: block; }
+svg:not([width]) { width: 20px; height: 20px; flex: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 
@@ -525,3 +526,6 @@ body.no-nav .main { padding-bottom: 40px; }
 .chip svg { width: 16px; height: 16px; display: inline-block; vertical-align: -3px; margin-right: 2px; }
 .task-more[hidden] { display: none; }
 .expand-btn { margin: 4px 0 -6px -10px; min-height: 36px; }
+.chev { width: 18px; height: 18px; color: var(--faint); flex: none; }
+.calm .badge { align-self: flex-start; }
+.card-link .row > svg:first-child { color: var(--accent); }

@@ -29,3 +29,16 @@ Judgment calls made without asking. One line each: what, then why.
 - Merge import keeps this device's settings and overwrites rows with matching keys; replace import uses the backup's settings. The passcode never leaves the device in an export.
 - Plan pages for future weeks show a preview generated without saving; the real plan is generated when the week starts.
 - `package.json` sets `"type": "module"` so the Vercel functions and `node --test` use ES modules like the front end.
+
+## Phase 2
+- Retirement counts rights answered while the interval is already 14 days: right at 3 goes to 7, right at 7 goes to 14, then two more rights at 14 retire it.
+- "Wrong twice" for persistent means two wrong answers in the redo's whole history, not two in a row; a persistent redo can still retire.
+- A redo starts from the later of the miss date and today, so back-dated misses don't arrive already overdue.
+- Heavy night keeps future tasks where they are, fits tonight's tasks into open time later in the week by priority, and only bumps a later task when tonight's task outranks it; the dropped task is marked skipped with `dropped: true` so it stays visible.
+- Heavy night also records the date in `settings.heavyNights` so later plan regenerations keep tonight empty; "Undo heavy night" restores it.
+- Fixed full tests can't be moved by Heavy night; the button is hidden on full-test days.
+- The taper is defined by days before the test (7 and 6: final set, 5 to 3: review, 2 and 1: logistics), so it also works for a test on a weekday such as the April school-day ACT.
+- The redo screen shows misses one at a time with Reveal, then Right or Wrong, because that mirrors flipping a flashcard and keeps the old answer hidden.
+- The cause tracker counts misses by cause over 14 days (not weighted) so the numbers match what he logged; the timing flag is noted next to the section.
+- The logistics checklist adds pencils and route to the spec's ticket, ID, calculator, and sleep, with checks saved per test date.
+- After a test date passes with no real scores logged, Today shows a card linking to a prefilled "Real ACT" entry; with no future test date, the plan runs in open mode and Today asks for the next date.
