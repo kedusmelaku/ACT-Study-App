@@ -42,3 +42,20 @@ Judgment calls made without asking. One line each: what, then why.
 - The cause tracker counts misses by cause over 14 days (not weighted) so the numbers match what he logged; the timing flag is noted next to the section.
 - The logistics checklist adds pencils and route to the spec's ticket, ID, calculator, and sleep, with checks saved per test date.
 - After a test date passes with no real scores logged, Today shows a card linking to a prefilled "Real ACT" entry; with no future test date, the plan runs in open mode and Today asks for the next date.
+
+## Phase 3
+- Demo mode was removed from the spec and not built, at the user's request.
+- The Claude proxy uses `fetch` against the Messages API directly instead of the Anthropic SDK, to keep the project dependency-free with no install step; it sends `anthropic-version: 2026-10-21` and `output_config.effort: "low"` so the small token caps go to the answer, not to thinking.
+- Server-side refusal fallbacks are not enabled because `CLAUDE_MODEL` is configurable and the fallback beta only applies to some models; a refusal shows the normal "Couldn't reach Claude" message.
+- The passcode check hashes both values with SHA-256 before `timingSafeEqual`, so lengths never leak and unequal lengths never throw; a missing `APP_PASSCODE` rejects every request.
+- Explain asks for JSON only, strips fences, and also accepts JSON embedded in prose; if parsing still fails the raw text is shown as the explanation.
+- Explain's photo is resized to a 1568px longest edge as JPEG at quality 0.85, stepping down until the encoded image is under about 1.6 MB so the request stays under 2 MB.
+- "Update existing miss" saves Claude's explanation on the miss and asks before replacing a fix line he already wrote.
+- Coach suggestions only map to a setting when Claude returns a weekday availability change (0 to 240 minutes); the server validates it and the Apply button changes that one setting and regenerates the plan.
+- The coach note is limited to one per plan week (Saturday to Friday), keyed by `weekStart` in `coachNotes`.
+- Topic trend arrows compare each topic's weight now with its weight computed as of 7 days ago: up 10 percent or more is "getting worse", down 10 percent is "improving", otherwise "steady"; topics with no weight a week ago are "new".
+- The trend chart spaces attempts evenly by order (not by date) so tests a few days apart stay readable; dates label the first, middle, and last points, and a table view lists every value.
+- Chart colors are separate `--chart-*` variables, checked with a colorblind-safety validator in light and dark mode; real ACTs are diamonds and practice tests are circles, so identity never relies on color alone.
+- `scripts/dev-server.js` runs the app and API with plain Node as a fallback to `npx vercel dev`.
+- `.vercelignore` keeps CLAUDE.md, DECISIONS.md, tests, and scripts out of the deployment, since the spec contains personal details.
+- A strict Content-Security-Policy is set in `vercel.json`; inline styles are allowed for computed widths and colors, scripts are not.
