@@ -6,6 +6,7 @@ import { addDays, compareDates, daysBetween, ageInDays, dateOf } from './dates.j
 import { redoStats } from './redo.js';
 import { completionRate } from './planner.js';
 import { nextTest, dayPhase } from './phase.js';
+import { detectHabits } from './habits.js';
 
 /** Attempts in date order with the estimated composite as of each one. */
 export function trendSeries(attempts) {
@@ -103,6 +104,7 @@ export function coachStats({ settings, attempts, misses, redos, pacing, tasks, t
     planCompletionLast14Days: rate === null ? null : round2(rate),
     tasksLast14Days: { done: recentTasks.filter((t) => t.status === 'done').length, skipped: recentTasks.filter((t) => t.status === 'skipped').length, moved: recentTasks.filter((t) => t.status === 'moved').length },
     studyMinutesByWeekday: { ...settings.availability },
+    habitsToWatch: detectHabits({ tasks, settings, misses, redos, today }).map((h) => h.title),
     attemptsLogged: attempts.length,
     lastAttemptDate: attempts.length ? attempts.map((a) => a.date).sort().slice(-1)[0] : null,
     missesLast14Days: misses.filter((m) => ageInDays(missDate(m), today) <= 14).length,

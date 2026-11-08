@@ -3,6 +3,7 @@ import { html, setHTML } from '../safe-html.js';
 import * as store from '../store.js';
 import { icon, topbar, emptyState, plural, toast, notice, copyText, chatPanel } from '../ui.js';
 import { coachChatPrompt, parseJsonReply, normalizeCoach } from '../logic/claude-format.js';
+import { detectHabits } from '../logic/habits.js';
 import { ALL_SECTIONS, SECTIONS, CAUSES, CAUSE_KEYS } from '../data/act.js';
 import { DAY_NAMES } from '../data/calendar.js';
 import { superscore } from '../logic/scoring.js';
@@ -89,6 +90,22 @@ function superscoreCard(sup) {
   </section>`;
 }
 
+export function habitsCard(habits) {
+  if (!habits.length) return '';
+  return html`<section class="stack">
+    <div class="section-title"><h2>Habits to watch</h2></div>
+    <div class="list">${habits.map(
+      (h) => html`<div class="list-item">
+        <span class="list-icon">${icon('alert')}</span>
+        <div class="grow stack-sm"><div class="strong">${h.title}</div><div class="small muted">${h.detail}</div>
+          ${h.suggestion && h.suggestion.type === 'availability'
+            ? html`<button class="btn btn-sm btn-secondary" style="align-self:flex-start" data-habit-apply="${h.suggestion.day}:${h.suggestion.minutes}">Set ${DAY_NAMES[h.suggestion.day]} to ${h.suggestion.minutes ? `${h.suggestion.minutes} min` : 'off'}</button>`
+            : ''}</div>
+      </div>`,
+    )}</div>
+  </section>`;
+}
+
 function coachCard() {
   const s = store.state;
   const ws = store.currentWeekStart();
@@ -119,7 +136,7 @@ function coachCard() {
   } else {
     const useChat = s.settings.claudeMode !== 'api';
     const disabled = !useChat && (!online || !s.settings.passcode);
-    body = html`<p class="small muted">A short note on your week from Claude, built only from your numbers. One per week.</p>
+    body = html`<p class="small muted">A short weekly note from Claude.</p>
       ${!useChat && !online ? notice('warn', 'Coach needs internet. Try again when you are online.') : ''}
       ${!useChat && online && !s.settings.passcode ? notice('info', html`Add your app passcode in <a href="#/settings">Settings</a> first.`) : ''}
       <button class="btn" data-action="coach" ${disabled ? html`disabled` : ''}>${icon(useChat ? 'tests' : 'sparkle')}${useChat ? "Copy this week's coach prompt" : "Get this week's note"}</button>
@@ -138,6 +155,7 @@ export function render(el) {
   const topics = topicTrends({ attempts: s.attempts, misses: s.misses, redos: s.redos, pacing: s.pacing, today });
   const split = causeSplit(s.misses, today);
   const hasAny = s.attempts.length || s.misses.length;
+  const habits = detectHabits({ tasks: s.tasks, settings: s.settings, misses: s.misses, redos: s.redos, today });
   const chart = series.length ? trendChart(series, { wide: window.matchMedia('(min-width: 900px)').matches }) : null;
 
   setHTML(
@@ -159,6 +177,7 @@ export function render(el) {
               ${superscoreCard(sup)}
               ${coachCard()}
             </div>
+            ${habitsCard(habits)}
             ${topicsCard(topics)}
             ${causeTracker(split, focus)}
           `}
@@ -171,6 +190,18 @@ export function render(el) {
     if (e.target.name === 'chatReply' && coachChat) coachChat.reply = e.target.value;
   });
   el.addEventListener('click', async (e) => {
+    const ha = e.target.closest('[data-habit-apply]');
+    if (ha) {
+      const [day, minutes] = ha.dataset.habitApply.split(':').map(Number);
+      try {
+        await store.saveSettings({ availability: { ...store.state.settings.availability, [day]: minutes } }, { regen: true });
+        toast(`${DAY_NAMES[day]} set to ${minutes ? `${minutes} min` : 'off'}.`);
+      } catch (err) {
+        console.error(err);
+        toast("Couldn't change that. Try again.");
+      }
+      return;
+    }
     const b = e.target.closest('[data-action]');
     if (!b) return;
     if (b.dataset.action === 'coach') await requestCoach();

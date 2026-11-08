@@ -6,6 +6,7 @@ import { taskCard, bindTaskActions, openReschedule } from './components.js';
 import { dayPhase, weekLabel, pendingRealScores, nextTest } from '../logic/phase.js';
 import { daysBetween, formatDate, addDays, ageInDays, dateOf } from '../logic/dates.js';
 import { dueRedos } from '../logic/redo.js';
+import { detectHabits } from '../logic/habits.js';
 import { LOGISTICS_CHECKLIST } from '../data/calendar.js';
 import { SECTIONS } from '../data/act.js';
 
@@ -116,6 +117,25 @@ export function render(el) {
   if (!target && !pending) {
     reminders.push(notice('info', html`The plan is in open-ended mode. <a href="#/settings">Add your next test date</a> (for example, the April school-day ACT).`));
   }
+  // Weekly coach reminder: once per plan week, until the note is saved or the reminder is dismissed.
+  const coachId = `coach-${ws}`;
+  const coachDue =
+    (s.attempts.length || s.misses.length) &&
+    phase.kind !== 'logistics' &&
+    !s.coachNotes.some((n) => n.weekStart === ws) &&
+    !(s.settings.dismissedReminders || []).some((r) => r.id === coachId);
+  if (coachDue) {
+    const habit = detectHabits({ tasks: s.tasks, settings: s.settings, misses: s.misses, redos: s.redos, today })[0];
+    reminders.push(html`<div class="card reminder">
+      <span class="list-icon sec-none">${icon('sparkle')}</span>
+      <div class="grow stack-sm">
+        <div class="strong">Weekly coach</div>
+        <p class="small muted">${habit ? `New week. Worth a look: ${habit.title.toLowerCase()}.` : 'New week. Get your coach note.'}</p>
+        <a class="btn btn-sm" href="#/progress" style="align-self:flex-start">Get the note</a>
+      </div>
+      <button class="icon-btn" data-action="dismiss-coach" data-id="${coachId}" aria-label="Dismiss">${icon('x')}</button>
+    </div>`);
+  }
   const backup = backupStatus();
   if (backup) {
     const msg = backup === 'never' ? "You haven't backed up yet." : "It's been over a week since your last backup.";
@@ -195,6 +215,16 @@ export function render(el) {
   el.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-action]');
     if (!b) return;
+    if (b.dataset.action === 'dismiss-coach') {
+      const list = (store.state.settings.dismissedReminders || []).filter((r) => ageInDays(dateOf(r.at), store.today()) <= 90);
+      try {
+        await store.saveSettings({ dismissedReminders: [...list, { id: b.dataset.id, kind: 'coach', weekStart: store.currentWeekStart(), at: store.nowISO() }] });
+        toast("Dismissed. It's in History if you want it back.");
+      } catch (err) {
+        reportError(err, "Couldn't dismiss that. Try again.");
+      }
+      return;
+    }
     if (b.dataset.action === 'move-all') {
       const ids = store.state.tasks.filter((t) => t.date === store.today() && (t.status === 'todo' || (t.status === 'skipped' && !t.dropped))).map((t) => t.id);
       await openReschedule(ids, { title: 'Move tonight to another day' });

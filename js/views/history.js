@@ -11,7 +11,7 @@ export const live = true;
 const DAYS_BACK = 56;
 let filter = 'all';
 
-const FILTERS = { all: 'All', skipped: 'Skipped', moved: 'Moved', deleted: 'Deleted', plan: 'Plan changes' };
+const FILTERS = { all: 'All', skipped: 'Skipped', moved: 'Moved', deleted: 'Deleted', plan: 'Plan changes', reminder: 'Reminders' };
 
 function when(iso) {
   const d = dateOf(iso);
@@ -35,6 +35,28 @@ function trashEvents(groups) {
     if (g.reason === 'plan') return { kind: 'plan', at: g.at, group: g };
     return { kind: 'deleted', at: g.at, group: g };
   });
+}
+
+function reminderEvents(today) {
+  const since = addDays(today, -DAYS_BACK);
+  return (store.state.settings.dismissedReminders || [])
+    .filter((r) => r && r.at && compareDates(dateOf(r.at), since) >= 0)
+    .map((r) => ({ kind: 'reminder', at: r.at, reminder: r }));
+}
+
+function reminderCard(r) {
+  const current = r.weekStart === store.currentWeekStart();
+  const noteSaved = store.state.coachNotes.some((n) => n.weekStart === r.weekStart);
+  return html`<article class="hist">
+    <span class="hist-icon">${icon('sparkle')}</span>
+    <div class="grow stack-sm">
+      <div class="strong">Weekly coach reminder dismissed</div>
+      <div class="tiny muted">Week of ${formatDate(r.weekStart)}, dismissed ${when(r.at)}${noteSaved ? '. Note saved later.' : ''}</div>
+      ${current && !noteSaved
+        ? html`<div class="row-wrap"><a class="btn btn-sm" href="#/progress">Get the note</a><button class="btn btn-sm btn-secondary" data-undismiss="${r.id}">Show on Today</button></div>`
+        : ''}
+    </div>
+  </article>`;
 }
 
 function sourceTitle(sourceId) {
@@ -115,7 +137,7 @@ export function render(el) {
 
 function draw(el, today, groups) {
   if (!el.isConnected) return;
-  const events = [...taskEvents(today), ...trashEvents(groups)].sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+  const events = [...taskEvents(today), ...trashEvents(groups), ...reminderEvents(today)].sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
   const counts = Object.fromEntries(Object.keys(FILTERS).map((k) => [k, k === 'all' ? events.length : events.filter((e) => e.kind === k).length]));
   const shown = filter === 'all' ? events : events.filter((e) => e.kind === filter);
   setHTML(
@@ -127,7 +149,7 @@ function draw(el, today, groups) {
           ${Object.entries(FILTERS).map(([k, v]) => html`<button type="button" data-filter="${k}" aria-pressed="${filter === k}">${v}${counts[k] ? ` (${counts[k]})` : ''}</button>`)}
         </div>
         ${shown.length
-          ? html`<div class="stack">${shown.map((e) => (e.kind === 'deleted' ? deletedCard(e.group) : e.kind === 'plan' ? planCard(e.group) : taskCardRow(e, today)))}</div>`
+          ? html`<div class="stack">${shown.map((e) => (e.kind === 'deleted' ? deletedCard(e.group) : e.kind === 'plan' ? planCard(e.group) : e.kind === 'reminder' ? reminderCard(e.reminder) : taskCardRow(e, today)))}</div>`
           : emptyState({ iconName: 'check', title: 'Nothing here', body: filter === 'all' ? 'Skipped, moved, and deleted things will show up here.' : 'Nothing of this kind recently.' })}
       </div>`,
   );
@@ -148,6 +170,12 @@ function draw(el, today, groups) {
         r.disabled = false;
         reportError(err, "Couldn't restore that. Try again.");
       }
+      return;
+    }
+    const u = e.target.closest('[data-undismiss]');
+    if (u) {
+      await store.saveSettings({ dismissedReminders: (store.state.settings.dismissedReminders || []).filter((r) => r.id !== u.dataset.undismiss) });
+      toast('Back on Today.');
       return;
     }
     const m = e.target.closest('[data-resched]');

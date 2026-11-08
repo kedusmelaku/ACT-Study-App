@@ -136,3 +136,8 @@ Judgment calls made without asking. One line each: what, then why.
 - Plan rebuilds record why they ran ("You logged or edited a test", "A new week started", "Synced with your other device"), and replaced tasks are listed but not restorable, since the new plan already covers that time.
 - Skipped tasks in History have a Reschedule button.
 - Appearance in Settings offers Match system, Light, or Dark, saved on the device; a tiny script in the page head applies it before anything draws so there is no flash of the wrong theme.
+
+## Weekly coach reminder and habits
+- Today shows a "Weekly coach" reminder each plan week until that week's note is saved; the × dismisses it for the week (synced), and dismissed reminders appear in History under Reminders with "Get the note" and "Show on Today".
+- Habits are found from the data, not by Claude: skipping 30% or more of the last two weeks' tasks, 4+ tasks never checked off, one weekday skipped or moved 3 of the last 4 weeks (with a one-tap "Set that day to 15 min or off"), 3+ heavy nights in two weeks, upcoming study days with more work than time, 10+ redos due, 3+ untagged misses, and drills done with no misses logged in 10 days.
+- Habits show on Progress, the reminder mentions the top one, and the coach prompt includes them and asks Claude to address the most important.
