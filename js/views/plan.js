@@ -75,7 +75,7 @@ export function render(el, ctx) {
           <a class="icon-btn" href="#/plan?w=${addDays(ws, 7)}" aria-label="Next week">${icon('chev')}</a>
         </div>
         ${ws !== current ? html`<a class="btn btn-secondary btn-sm" href="#/plan">Back to this week</a>` : ''}
-        ${preview ? notice('info', 'Preview. This week is planned for real when it starts, using your latest results.') : ''}
+        ${preview ? notice('info', 'Preview. The real plan is made when this week starts.') : ''}
         ${notes.map((n) => notice('info', n))}
         ${weekStrip(dates, tasks, today, s.settings)}
         <div class="seg view-toggle" role="group" aria-label="Plan view">

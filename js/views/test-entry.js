@@ -383,7 +383,7 @@ function stepSource() {
             ${mats.map((m) => html`<option value="${m.sourceId}" ${draft.sourceId === m.sourceId ? html`selected` : ''}>${m.title}${used.has(m.sourceId) ? ' (logged before)' : ''}</option>`)}
             <option value="other" ${draft.sourceId === 'other' ? html`selected` : ''}>Something else</option>
           </select>
-          ${!mats.some((m) => m.format === 'legacy') ? html`<span class="hint">Legacy tests show up here once you add them in Settings.</span>` : ''}
+          ${!mats.some((m) => m.format === 'legacy') ? html`<span class="hint">Add legacy tests in Settings to see them here.</span>` : ''}
         </div>`
       : ''}
     <div class="grid-2">
@@ -420,7 +420,7 @@ function stepScores() {
           <input class="input input-score" id="sc-${s}" data-score="${s}" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="${draft.scores[s]}" placeholder="--" autocomplete="off"></div>`,
       )}
     </div>
-    ${draft.scale === 35 ? html`<p class="hint">35-point scores are kept as entered and flagged as capped at 35.</p>` : ''}
+    ${draft.scale === 35 ? html`<p class="hint">Scored out of 35.</p>` : ''}
     <p class="error-text" data-error hidden></p>
     <div class="sticky-actions"><button class="btn btn-secondary" data-action="back">Back</button><button class="btn" data-action="next">Next</button></div>
   </div>`;
@@ -456,9 +456,9 @@ function stepMisses() {
     <details class="card" ${draft.pacing[s] ? html`open` : ''}>
       <summary class="strong">Pacing for ${SECTIONS[s].label} <span class="small muted">(optional)</span></summary>
       <div class="mt">
-        ${stepper('notReached', 'Questions not reached', 'Left blank or never read')}
-        ${stepper('guessedAtEnd', 'Guessed at the end', 'Filled in to beat the clock')}
-        ${stepper('minutesLeft', 'Minutes left over', 'Time remaining when you finished')}
+        ${stepper('notReached', 'Questions not reached', 'Never got to them')}
+        ${stepper('guessedAtEnd', 'Guessed at the end', 'Bubbled in to beat the clock')}
+        ${stepper('minutesLeft', 'Minutes left over', 'When you finished')}
       </div>
       <p class="notice notice-warn mt" data-timing-flag ${isTimingFlag(p) ? '' : html`hidden`}>Timing flag: this section will lean toward pacing drills.</p>
     </details>

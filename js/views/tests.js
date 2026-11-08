@@ -13,7 +13,7 @@ export function scoreRow(scores, scale) {
     ${ALL_SECTIONS.map(
       (s) => html`<div class="score-cell sec-${s}"><b>${scores && scores[s] ? scores[s] : '--'}</b><span>${SECTIONS[s].label}</span></div>`,
     )}
-  </div>${scale === 35 ? html`<p class="hint mt">On a 35-point scale, shown as entered and capped at 35.</p>` : ''}`;
+  </div>${scale === 35 ? html`<p class="hint mt">Scored out of 35.</p>` : ''}`;
 }
 
 export function attemptTitle(a) {

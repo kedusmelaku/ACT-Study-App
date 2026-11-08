@@ -78,7 +78,7 @@ function planCard(g) {
     <span class="hist-icon">${icon('plan')}</span>
     <div class="grow stack-sm">
       <div class="strong">Plan updated: ${plural(tasks.length, 'task')} replaced</div>
-      <div class="small muted">${g.note || 'The plan updated'}, ${when(g.at)}. Unfinished tasks were swapped for ones that fit your latest results and time.</div>
+      <div class="small muted">${g.note || 'The plan updated'}, ${when(g.at)}.</div>
       <details><summary class="small strong">What was replaced</summary>
         <ul class="small hist-list">${tasks
           .sort((a, b) => compareDates(a.date, b.date))
@@ -103,7 +103,7 @@ function taskCardRow(e, today) {
 
 export function render(el) {
   const today = store.today();
-  setHTML(el, html`${topbar('History', { back: '#/more', eyebrow: 'Nothing disappears without a reason' })}<div class="stack"><div class="skeleton"></div><div class="skeleton" style="width:70%"></div></div>`);
+  setHTML(el, html`${topbar('History', { back: '#/more', eyebrow: '' })}<div class="stack"><div class="skeleton"></div><div class="skeleton" style="width:70%"></div></div>`);
   store
     .loadTrash()
     .then((groups) => draw(el, today, groups))
@@ -120,9 +120,9 @@ function draw(el, today, groups) {
   const shown = filter === 'all' ? events : events.filter((e) => e.kind === filter);
   setHTML(
     el,
-    html`${topbar('History', { back: '#/more', eyebrow: 'Nothing disappears without a reason' })}
+    html`${topbar('History', { back: '#/more', eyebrow: '' })}
       <div class="stack-lg">
-        <p class="small muted">Skipped and moved tasks from the last 8 weeks, things you deleted (restorable for ${store.TRASH_DAYS} days), and every time the plan swapped out unfinished tasks.</p>
+        <p class="small muted">The last 8 weeks. Deleted items can be restored for ${store.TRASH_DAYS} days.</p>
         <div class="seg" role="group" aria-label="Filter">
           ${Object.entries(FILTERS).map(([k, v]) => html`<button type="button" data-filter="${k}" aria-pressed="${filter === k}">${v}${counts[k] ? ` (${counts[k]})` : ''}</button>`)}
         </div>

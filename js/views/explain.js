@@ -60,7 +60,7 @@ export function render(el, ctx) {
     <div class="stack-lg">
       ${!useChat && !online ? notice('warn', "Explain needs internet. Your miss is saved, try again when you're online.") : ''}
       ${!useChat && online && !passcode ? notice('info', html`Add your app passcode in <a href="#/settings">Settings</a> to use Explain.`) : ''}
-      ${useChat && !chat && !result ? notice('info', html`Free with your Claude plan: fill this in, copy the prompt into Claude, then paste the reply back here. <a href="#/settings">Change mode</a>`) : ''}
+      ${useChat && !chat && !result ? notice('info', html`Fill this in, copy the prompt into Claude, then paste the reply back. <a href="#/settings">Change mode</a>`) : ''}
       ${chat
         ? chatPanel({
             prompt: chat.prompt,
@@ -95,7 +95,7 @@ export function render(el, ctx) {
           ${form.image
             ? html`<div class="stack-sm"><img class="preview-img" src="${form.image.preview}" alt="Question photo preview"><button type="button" class="btn btn-secondary btn-sm" data-action="remove-photo">${icon('trash')}Remove photo</button></div>`
             : html`<label class="btn btn-secondary">${icon('camera')}Add a photo<input type="file" accept="image/*" capture="environment" data-photo hidden></label>`}
-          <span class="hint">Only from your own practice test. Sent for this explanation and never stored.</span>
+          <span class="hint">From your own practice test. Never stored.</span>
         </div>`}
         <div class="grid-2">
           <div class="field"><label for="ex-my">My answer</label><input class="input" id="ex-my" name="myAnswer" maxlength="200" value="${form.myAnswer}"></div>

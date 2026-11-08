@@ -57,7 +57,7 @@ export function render(el) {
           )}
           <button class="list-item" data-action="add-test"><span class="list-icon">${icon('plus')}</span><div class="grow strong">Add a test date</div></button>
         </div>
-        <p class="hint">The plan aims at the next date. After a test, it switches to the next one automatically.</p>
+        <p class="hint">The plan always aims at the next date.</p>
       </section>
 
       <section class="stack" id="time">
@@ -70,7 +70,7 @@ export function render(el) {
               <button type="button" data-avail="${d}:1" aria-label="More time on ${DAY_NAMES[d]}">+</button></div></div>`,
           )}
         </div>
-        <p class="hint">A day with 90 minutes or more becomes a block with a timed section. Homework comes first: use Heavy night on Today, or mark busy days below.</p>
+        <p class="hint">Days with 90+ minutes get a timed section.</p>
       </section>
 
       <section class="stack">
@@ -108,7 +108,7 @@ export function render(el) {
           })}
           <button class="list-item" data-action="add-full"><span class="list-icon">${icon('plus')}</span><div class="grow strong">Add a full-test day</div></button>
         </div>
-        <p class="hint">Full tests are fixed. The official enhanced tests are saved for these days and never used for drills.</p>
+        <p class="hint">Practice Tests 1 and 2 are saved for these days.</p>
       </section>
 
       <section class="stack" id="materials">
@@ -173,14 +173,14 @@ export function render(el) {
             </div>
           </div>
           ${s.claudeMode === 'api'
-            ? html`<p class="small muted">The app calls Claude for you through your Vercel deployment. Uses paid API credits from the Anthropic Console.</p>`
-            : html`<p class="small muted">Free with your Claude plan. The app copies a ready-made prompt, you paste it into Claude, then paste the reply back. Nothing is sent from the app.</p>`}
+            ? html`<p class="small muted">The app calls Claude directly. Uses paid API credits.</p>`
+            : html`<p class="small muted">Free with your Claude plan. Copy the prompt into Claude, then paste the reply back.</p>`}
         </div>
         ${s.claudeMode === 'api'
           ? html`<form class="card stack" data-passcode-form>
               <div class="field"><label for="passcode">App passcode</label>
                 <input class="input" id="passcode" name="passcode" type="password" autocomplete="current-password" maxlength="200" value="${s.passcode || ''}" placeholder="The APP_PASSCODE you set in Vercel"></div>
-              <p class="hint">Stored only on this device and sent with Explain and Coach requests.</p>
+              <p class="hint">Only stored on this device.</p>
               <button class="btn btn-secondary" type="submit">Save passcode</button>
             </form>`
           : ''}
@@ -221,10 +221,10 @@ function syncCard(s) {
   const sync = s.sync || {};
   if (!sync.enabled) {
     return html`<form class="card stack" data-sync-form>
-      <p class="small muted">Keep your phone and laptop in step: tests, the error log, redos, the plan, and settings. Needs the sync database set up in Vercel (see the README).</p>
+      <p class="small muted">Keep your devices in step. Needs the sync database set up in Vercel (see the README).</p>
       <div class="field"><label for="sync-pass">App passcode</label>
         <input class="input" id="sync-pass" name="passcode" type="password" autocomplete="current-password" maxlength="200" value="${s.passcode || ''}" placeholder="The APP_PASSCODE you set in Vercel"></div>
-      <p class="hint">Use the same passcode on every device.</p>
+      <p class="hint">Same passcode on every device.</p>
       <button class="btn" type="submit">Turn on sync</button>
     </form>`;
   }
@@ -232,7 +232,7 @@ function syncCard(s) {
     <div class="spread"><div><div class="strong">${sync.lastError ? 'Not synced' : 'Synced'}</div><div class="small muted">Last sync ${ago(sync.lastSyncAt)}</div></div>
       <button class="btn btn-sm btn-secondary" data-action="sync-now">Sync now</button></div>
     ${sync.lastError ? notice('warn', sync.lastError) : ''}
-    <p class="hint">Syncs when the app opens, a few seconds after changes, and every few minutes while open. Works offline and catches up later.</p>
+    <p class="hint">Syncs on its own. Works offline.</p>
     <button class="btn btn-ghost btn-sm" data-action="sync-off">Turn off sync on this device</button>
   </div>`;
 }
@@ -461,8 +461,8 @@ async function doImport(file) {
       <button class="btn btn-danger" data-close="replace">Replace everything on this device</button>
       <button class="btn btn-secondary" data-close="">Cancel</button>
     </div>
-    <p class="hint">Merge keeps your current data and adds what's missing. If an item is in both, the more recently edited version wins.</p>
-    ${store.state.settings.sync && store.state.settings.sync.enabled ? html`<p class="hint strong">Sync is on, so Replace also removes these items from your other devices.</p>` : ''}`);
+    <p class="hint">Merge keeps both, and the newer edit wins. Replace swaps everything for the backup.</p>
+    ${store.state.settings.sync && store.state.settings.sync.enabled ? html`<p class="hint strong">Sync is on, so Replace also deletes from your other devices.</p>` : ''}`);
   if (mode !== 'merge' && mode !== 'replace') return;
   try {
     await store.importBackup(obj, mode);

@@ -68,7 +68,7 @@ Put all of these values in `js/data/act.js` as constants. Nothing else should ha
 - **Errors:** show the user plain-language messages only ("Couldn't reach Claude. Check your connection and try again."). Never show stack traces, status codes, or raw error text. Log the details to the console.
 - **No mock data.** Empty states show helpful prompts, not fake rows.
 - **UI copy:** no em dashes. Use commas or periods instead.
-- **Hints:** don't add helper text for things that are common sense (for example, explaining what a Light/Dark/Match system switch does). Only add a hint when it tells the user something they couldn't guess.
+- **Hints:** don't add helper text for things that are common sense (for example, explaining what a Light/Dark/Match system switch does). Only add a hint when it tells the user something they couldn't guess. Keep any copy short and plain, the way a person would say it, not over-explained.
 - **Theme:** light and dark mode, following the system setting through `prefers-color-scheme`. All colors come from CSS variables.
 - **Validation:** run `node --check` on every JS file after each phase. Keep the logic modules (`js/logic/*`) pure, with no DOM and no IndexedDB, so they can be tested with `node --test`.
 

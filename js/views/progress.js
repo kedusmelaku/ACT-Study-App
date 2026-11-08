@@ -103,7 +103,7 @@ function coachCard() {
     body = html`<p>${note.text}</p>
       ${sug ? html`<div class="card card-accent card-tight stack-sm"><div class="tiny strong muted">AN OPTION</div><p class="small">${sug.text}</p>
         ${setting ? html`<button class="btn btn-sm ${applied ? 'btn-secondary' : ''}" data-action="apply" ${applied ? html`disabled` : ''}>${applied ? 'Applied' : `Apply: ${DAY_NAMES[setting.day]} ${setting.minutes ? `${setting.minutes} min` : 'off'}`}</button>` : ''}</div>` : ''}
-      <p class="hint">Saved ${formatDate(dateOf(note.createdAt))}. The plan stays in charge; this note is advice. Next note available next week.</p>`;
+      <p class="hint">Saved ${formatDate(dateOf(note.createdAt))}. New note next week.</p>`;
   } else if (coachChat && coachChat.weekStart === ws) {
     return chatPanel({
       prompt: coachChat.prompt,
@@ -123,7 +123,7 @@ function coachCard() {
       ${!useChat && !online ? notice('warn', 'Coach needs internet. Try again when you are online.') : ''}
       ${!useChat && online && !s.settings.passcode ? notice('info', html`Add your app passcode in <a href="#/settings">Settings</a> first.`) : ''}
       <button class="btn" data-action="coach" ${disabled ? html`disabled` : ''}>${icon(useChat ? 'tests' : 'sparkle')}${useChat ? "Copy this week's coach prompt" : "Get this week's note"}</button>
-      ${useChat ? html`<p class="hint">Only your numbers go into the prompt: estimates, topic weights, cause counts, redo and completion stats. No questions or notes.</p>` : ''}
+      ${useChat ? html`<p class="hint">Only your numbers go in the prompt, no questions or notes.</p>` : ''}
       ${older ? html`<details><summary class="small strong">Last note (${formatDate(older.weekStart, { weekday: false })})</summary><p class="small mt">${older.text}</p></details>` : ''}`;
   }
   return html`<section class="card stack"><div class="row">${icon('sparkle')}<h2 class="grow">Weekly coach</h2></div>${body}</section>`;
