@@ -126,3 +126,5 @@ Judgment calls made without asking. One line each: what, then why.
 - A day never gets a second redo session: one that's kept, skipped, moved, or rescheduled there stops the plan from adding another.
 - Today has "Move all of tonight to another day", which moves every task still open tonight (including skipped ones) to one chosen day, with Undo; Heavy night still spreads tonight across the week automatically.
 - Only full tests can go on a full-test day; other tasks are refused there.
+- Plan has a week strip on top (one tile per day: a colored bar per task, solid when done, minutes left) so the whole week is visible on a phone, and tapping a tile jumps to that day.
+- Plan offers List or Board, remembered on the device. Board shows day columns: all seven across on a laptop, about one and a half at a time on a phone with swipe and snap, opening on today. Tapping a board card opens the full task with Done, Skip, and Reschedule.
