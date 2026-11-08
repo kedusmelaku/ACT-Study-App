@@ -2,7 +2,7 @@
 import { html, setHTML } from '../safe-html.js';
 import * as store from '../store.js';
 import { icon, topbar, notice, plural, fmtMinutes, toast, reportError, confirmSheet, sectionBadge } from '../ui.js';
-import { taskCard, bindTaskActions } from './components.js';
+import { taskCard, bindTaskActions, openReschedule } from './components.js';
 import { dayPhase, weekLabel, pendingRealScores, nextTest } from '../logic/phase.js';
 import { daysBetween, formatDate, addDays, ageInDays, dateOf } from '../logic/dates.js';
 import { dueRedos } from '../logic/redo.js';
@@ -79,6 +79,8 @@ export function render(el) {
   const persistent = s.redos.filter((r) => r.status === 'persistent').map((r) => s.misses.find((m) => m.id === r.missId)).filter(Boolean);
   const heavy = (s.settings.heavyNights || []).includes(today);
   const hasFixed = todo.some((t) => t.fixed);
+  // Everything still open tonight (not done), including skipped tasks.
+  const movableTonight = tonight.filter((t) => t.status === 'todo' || (t.status === 'skipped' && !t.dropped));
   const ws = store.currentWeekStart();
   const est = focus.composite;
 
@@ -148,8 +150,11 @@ export function render(el) {
         ${phase.kind === 'review' ? notice('info', 'Taper week: error log and redo review only. No new practice.') : ''}
         ${phase.kind === 'taper-weekend' ? notice('info', 'Taper starts now. One final timed set in the next two days, then review only.') : ''}
         ${tonight.length ? tonight.map((t) => taskCard(t)) : emptyTonight(heavy, upcoming)}
+        ${movableTonight.length > 1
+          ? html`<button class="btn btn-secondary btn-block" data-action="move-all">${icon('plan')}Move all of tonight to another day</button>`
+          : ''}
         ${todo.length && !hasFixed
-          ? html`<button class="btn btn-secondary btn-block" data-action="heavy">${icon('moon')}Heavy night, move tonight's work</button>`
+          ? html`<button class="btn btn-ghost btn-block" data-action="heavy">${icon('moon')}Heavy night, spread tonight across the week</button>`
           : ''}
         ${heavy ? html`<button class="btn btn-ghost btn-block" data-action="unheavy">Undo heavy night</button>` : ''}
       </section>
@@ -190,6 +195,11 @@ export function render(el) {
   el.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-action]');
     if (!b) return;
+    if (b.dataset.action === 'move-all') {
+      const ids = store.state.tasks.filter((t) => t.date === store.today() && (t.status === 'todo' || (t.status === 'skipped' && !t.dropped))).map((t) => t.id);
+      await openReschedule(ids, { title: 'Move tonight to another day' });
+      return;
+    }
     if (b.dataset.action === 'heavy') {
       const ok = await confirmSheet({
         title: 'Heavy night?',

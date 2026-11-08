@@ -182,3 +182,42 @@ test('science stays at one slot a week even after an earlier science task is don
   const later = plan({ weekStart: '2026-11-14', today: addDays(sci.date, 1), existingTasks: tasks, misses: [...misses, miss('science', 'Graph reading', 'careless', addDays(sci.date, 1))] });
   assert.equal(later.tasks.filter((t) => t.section === 'science' && t.status !== 'moved').length, 1);
 });
+
+test('rescheduling a redo task postpones its due redos instead of duplicating the task', async () => {
+  const { rescheduleTask } = await import('../js/logic/planner.js');
+  const { createRedo } = await import('../js/logic/redo.js');
+  const misses = [miss('reading', 'Inference', 'trap', '2026-11-12'), miss('math', 'Vectors', 'content', '2026-11-12')];
+  const redos = misses.map((m) => createRedo(m.id, '2026-11-12')); // due Nov 15
+  redos.push({ ...createRedo('later', '2026-11-20') }); // due Nov 23, not covered
+  const first = plan({ weekStart: '2026-11-14', today: '2026-11-16', misses, redos });
+  const redoTask = first.tasks.find((t) => t.type === 'redo' && t.date === '2026-11-16');
+  assert.ok(redoTask);
+  const { original, copy, redoUpdates } = rescheduleTask(redoTask, '2026-11-19', mkSettings(), { redos });
+  assert.equal(original.status, 'moved');
+  assert.equal(copy.date, '2026-11-19');
+  assert.equal(copy.pinned, true);
+  assert.equal(copy.count, 2);
+  assert.deepEqual(redoUpdates.map((r) => r.dueDate), ['2026-11-19', '2026-11-19']);
+  const newRedos = redos.map((r) => redoUpdates.find((u) => u.missId === r.missId) || r);
+  const tasks = first.tasks.map((t) => (t.id === redoTask.id ? original : t)).concat(copy);
+  const again = plan({ weekStart: '2026-11-14', today: '2026-11-16', existingTasks: tasks, misses, redos: newRedos });
+  const redoTasks = again.tasks.filter((t) => t.type === 'redo' && t.status === 'todo');
+  assert.deepEqual(redoTasks.map((t) => t.id), [copy.id], 'exactly one redo session, the rescheduled one');
+});
+
+test('a skipped redo session is not replaced by a second one the same night', () => {
+  const misses = [miss('reading', 'Inference', 'trap', '2026-11-12')];
+  const redos = [{ missId: misses[0].id, dueDate: '2026-11-16', interval: 3, streak: 0, history: [], status: 'active' }];
+  const first = plan({ weekStart: '2026-11-14', today: '2026-11-16', misses, redos });
+  const tasks = first.tasks.map((t) => (t.type === 'redo' && t.date === '2026-11-16' ? { ...t, status: 'skipped' } : t));
+  const again = plan({ weekStart: '2026-11-14', today: '2026-11-16', existingTasks: tasks, misses, redos });
+  assert.equal(again.tasks.filter((t) => t.type === 'redo' && t.date === '2026-11-16').length, 1);
+  assert.ok(again.tasks.some((t) => t.type === 'redo' && t.date === '2026-11-17' && t.status === 'todo'), 'the still-due redo comes back the next study day');
+});
+
+test('other tasks cannot be moved onto a full-test day', async () => {
+  const { rescheduleProblem } = await import('../js/logic/planner.js');
+  const drill = { id: 'd', type: 'drill', status: 'todo', date: '2026-11-16', minutes: 30 };
+  assert.equal(rescheduleProblem(drill, '2026-11-25', '2026-11-16', mkSettings()), 'That day is saved for a full test. Pick another day.');
+  assert.equal(rescheduleProblem(drill, '2026-11-24', '2026-11-16', mkSettings()), null);
+});

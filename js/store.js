@@ -454,36 +454,68 @@ export async function setTaskStatus(id, status) {
 }
 
 /**
- * Move a todo or skipped task to another day. Throws an error with a plain `userMessage` if it can't.
- * Returns an undo function.
+ * Move todo or skipped tasks to another day. Tasks that can't go there are left alone.
+ * Throws an error with a plain `userMessage` if none can move. Returns { moved, skipped, undo }.
  */
-export async function rescheduleTask(id, toDate) {
-  const task = state.tasks.find((t) => t.id === id);
-  const problem = rescheduleProblem(task, toDate, today(), state.settings);
-  if (problem) throw Object.assign(new Error(problem), { userMessage: problem });
-  const before = { task: { ...task }, fullTests: state.settings.fullTests };
-  const { original, copy, settingsPatch } = planReschedule(task, toDate, state.settings);
-  const ops = [{ store: 'tasks', type: 'put', value: original }];
-  if (copy) ops.push({ store: 'tasks', type: 'put', value: copy });
-  if (settingsPatch) {
-    state.settings = nextSettings(settingsPatch);
-    ops.push({ store: 'settings', type: 'put', value: state.settings });
+export async function rescheduleTasks(ids, toDate) {
+  const before = { tasks: [], fullTests: state.settings.fullTests, redos: [] };
+  const ops = [];
+  const copies = [];
+  const originals = new Map();
+  let settingsChanged = false;
+  let problem = null;
+  for (const id of ids) {
+    const task = state.tasks.find((t) => t.id === id);
+    const why = rescheduleProblem(task, toDate, today(), state.settings);
+    if (why) {
+      problem = problem || why;
+      continue;
+    }
+    before.tasks.push({ ...task });
+    const res = planReschedule(task, toDate, state.settings, { redos: state.redos });
+    originals.set(id, res.original);
+    ops.push({ store: 'tasks', type: 'put', value: res.original });
+    if (res.copy) {
+      copies.push(res.copy);
+      ops.push({ store: 'tasks', type: 'put', value: res.copy });
+    }
+    if (res.settingsPatch) {
+      state.settings = nextSettings(res.settingsPatch);
+      settingsChanged = true;
+    }
+    for (const r of res.redoUpdates) {
+      if (!before.redos.some((x) => x.missId === r.missId)) before.redos.push(state.redos.find((x) => x.missId === r.missId));
+      ops.push({ store: 'redos', type: 'put', value: r });
+      state.redos = state.redos.map((x) => (x.missId === r.missId ? r : x));
+    }
   }
+  if (!originals.size) throw Object.assign(new Error(problem || 'Nothing to move'), { userMessage: problem || 'Nothing here can be moved.' });
+  if (settingsChanged) ops.push({ store: 'settings', type: 'put', value: state.settings });
   await db.batch(ops);
-  state.tasks = state.tasks.map((t) => (t.id === id ? original : t));
-  if (copy) state.tasks = [...state.tasks.filter((t) => t.id !== copy.id), copy];
+  const copyIds = new Set(copies.map((c) => c.id));
+  state.tasks = [...state.tasks.filter((t) => !copyIds.has(t.id)).map((t) => originals.get(t.id) || t), ...copies];
   await regenerateAndEmit();
-  return async () => {
-    const undoOps = [{ store: 'tasks', type: 'put', value: before.task }];
-    if (copy) undoOps.push({ store: 'tasks', type: 'delete', key: copy.id });
-    if (settingsPatch) {
+  const undo = async () => {
+    const undoOps = before.tasks.map((t) => ({ store: 'tasks', type: 'put', value: t }));
+    for (const c of copies) undoOps.push({ store: 'tasks', type: 'delete', key: c.id });
+    for (const r of before.redos) undoOps.push({ store: 'redos', type: 'put', value: r });
+    if (settingsChanged) {
       state.settings = nextSettings({ fullTests: before.fullTests });
       undoOps.push({ store: 'settings', type: 'put', value: state.settings });
     }
     await db.batch(undoOps);
-    state.tasks = state.tasks.filter((t) => !copy || t.id !== copy.id).map((t) => (t.id === id ? before.task : t));
+    const restored = new Map(before.tasks.map((t) => [t.id, t]));
+    state.tasks = state.tasks.filter((t) => !copyIds.has(t.id)).map((t) => restored.get(t.id) || t);
+    const oldRedos = new Map(before.redos.map((r) => [r.missId, r]));
+    state.redos = state.redos.map((r) => oldRedos.get(r.missId) || r);
     await regenerateAndEmit();
   };
+  return { moved: originals.size, skipped: ids.length - originals.size, undo };
+}
+
+/** Move one task. Returns an undo function. */
+export async function rescheduleTask(id, toDate) {
+  return (await rescheduleTasks([id], toDate)).undo;
 }
 
 /** Heavy night: move tonight's tasks later this week. Returns the one-line message. */

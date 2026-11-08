@@ -379,6 +379,7 @@ function redoTask(count) {
     title: `Redo ${count} missed question${count === 1 ? '' : 's'}`,
     detail: 'Open Redo, find each question in the official test, answer it fresh, then reveal and mark it right or wrong.',
     minutes: count * REDO.minutesPerRedo,
+    count,
     priority: PRIORITY.redo,
   };
 }
@@ -525,6 +526,11 @@ export function generateWeek({ weekStart, today, settings, focus, redos = [], ma
     dayNext[d] = 1;
     const phase = dayPhase(d, settings);
     redoCarry += redoCounts[d] || 0;
+    // A day that already has a redo session (kept, skipped, moved, or rescheduled here) gets no second one.
+    // A rescheduled session still to do covers the redos postponed to it.
+    const keptRedo = kept.find((t) => t.date === d && t.type === 'redo');
+    if (keptRedo && keptRedo.status === 'todo') redoCarry -= Math.min(redoCarry, Number(keptRedo.count) || redoCarry);
+    const redoToday = keptRedo ? 0 : redoCarry;
     let cap = remaining[d];
     if (fullTestDays.has(d) || isNoStudyDay(d, settings) || cap < MIN_SLOT) continue;
 
@@ -555,8 +561,8 @@ export function generateWeek({ weekStart, today, settings, focus, redos = [], ma
     }
 
     if (phase.kind === 'review') {
-      if (redoCarry > 0 && cap >= MIN_SLOT) {
-        const n = Math.min(redoCarry, Math.max(1, Math.floor((cap - 10) / REDO.minutesPerRedo)));
+      if (redoToday > 0 && cap >= MIN_SLOT) {
+        const n = Math.min(redoToday, Math.max(1, Math.floor((cap - 10) / REDO.minutesPerRedo)));
         add(d, dayNext[d]++, redoTask(n));
         redoCarry -= n;
         cap -= n * REDO.minutesPerRedo;
@@ -572,9 +578,9 @@ export function generateWeek({ weekStart, today, settings, focus, redos = [], ma
     }
 
     // Build / open days.
-    if (redoCarry > 0) {
+    if (redoToday > 0) {
       const maxRedo = cap < BLOCK_MIN ? Math.floor(cap / 2) : 30;
-      const n = Math.min(redoCarry, Math.max(1, Math.floor(maxRedo / REDO.minutesPerRedo)));
+      const n = Math.min(redoToday, Math.max(1, Math.floor(maxRedo / REDO.minutesPerRedo)));
       add(d, dayNext[d]++, redoTask(n));
       redoCarry -= n;
       cap -= n * REDO.minutesPerRedo;
@@ -664,9 +670,8 @@ export function rescheduleProblem(task, toDate, today, settings) {
   if (compareDates(toDate, today) < 0) return 'Pick today or a later day.';
   if (toDate === task.date) return 'Pick a different day.';
   if (isNoStudyDay(toDate, settings)) return 'No studying is planned that day. Pick another day.';
-  if (task.type === 'full_test') {
-    const other = fullTestOn(settings, toDate);
-    if (other) return 'Another full test is already on that day.';
+  if (fullTestOn(settings, toDate)) {
+    return task.type === 'full_test' ? 'Another full test is already on that day.' : 'That day is saved for a full test. Pick another day.';
   }
   return null;
 }
@@ -676,17 +681,40 @@ export function rescheduleProblem(task, toDate, today, settings) {
  * The original becomes `moved` (it keeps its time on the old day). A full test moves its full-test day
  * in settings, and the planner builds it on the new date; any other task gets a pinned copy on the new
  * date that regeneration leaves alone.
- * Returns { original, copy, settingsPatch }.
+ * A redo task postpones the redos it covered (due on or before its day) to the new date, so the plan
+ * puts one redo session there instead of a duplicate.
+ * Returns { original, copy, settingsPatch, redoUpdates }.
  */
-export function rescheduleTask(task, toDate, settings) {
+export function rescheduleTask(task, toDate, settings, { redos = [] } = {}) {
   const original = { ...task, status: 'moved', movedTo: toDate };
   delete original.dropped;
+  if (task.type === 'redo') {
+    const redoUpdates = redos
+      .filter((r) => r.status !== 'retired' && r.dueDate && compareDates(r.dueDate, task.date) <= 0)
+      .map((r) => ({ ...r, dueDate: toDate }));
+    const n = redoUpdates.length || Number(task.count) || 0;
+    const copy = n
+      ? {
+          ...redoTask(n),
+          id: `${task.id}-r-${toDate}`,
+          weekStart: weekStartFor(toDate),
+          date: toDate,
+          slot: 0,
+          status: 'todo',
+          origin: 'rescheduled',
+          pinned: true,
+          movedFrom: task.date,
+          materialRef: null,
+        }
+      : null;
+    return { original, copy, settingsPatch: null, redoUpdates };
+  }
   if (task.type === 'full_test') {
     const sourceId = task.materialRef ? task.materialRef.sourceId : null;
     const fullTests = (settings.fullTests || []).filter((f) => f.date !== task.date);
     fullTests.push({ date: toDate, sourceId });
     fullTests.sort((a, b) => compareDates(a.date, b.date));
-    return { original, copy: null, settingsPatch: { fullTests } };
+    return { original, copy: null, settingsPatch: { fullTests }, redoUpdates: [] };
   }
   const copy = {
     ...task,
@@ -701,7 +729,7 @@ export function rescheduleTask(task, toDate, settings) {
   };
   delete copy.dropped;
   delete copy.movedTo;
-  return { original, copy, settingsPatch: null };
+  return { original, copy, settingsPatch: null, redoUpdates: [] };
 }
 
 // ---------------------------------------------------------------- heavy night

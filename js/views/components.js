@@ -42,8 +42,6 @@ export function taskCard(t, { showActions = true, collapsed = false } = {}) {
   const cause = t.cause && CAUSES[t.cause] ? html`<span class="badge">${CAUSES[t.cause].short}</span>` : '';
   // Plan shows a quick checkbox; Today shows Done and Skip buttons and a checkbox once done.
   const canAct = showActions && (collapsed ? t.status === 'todo' || t.status === 'done' : done);
-  // Redos stay due until answered, and the plan adds them every day, so moving one would only duplicate it.
-  const movable = t.type !== 'redo';
   return html`<article class="task ${secClass(t.section)} is-${t.status}" data-task="${t.id}">
     ${canAct
       ? html`<button class="check" data-action="toggle-done" data-id="${t.id}" aria-pressed="${done ? 'true' : 'false'}" aria-label="${done ? 'Mark not done' : 'Mark done'}">${icon('check')}</button>`
@@ -65,12 +63,12 @@ export function taskCard(t, { showActions = true, collapsed = false } = {}) {
             <button class="btn btn-sm" data-action="done" data-id="${t.id}">${icon('check')}Done</button>
             <button class="btn btn-sm btn-secondary" data-action="skip" data-id="${t.id}">Skip</button>
           </div>
-          ${movable ? html`<button class="btn btn-ghost btn-sm reschedule-btn" data-action="reschedule" data-id="${t.id}">${icon('plan')}Reschedule</button>` : ''}`
+          <button class="btn btn-ghost btn-sm reschedule-btn" data-action="reschedule" data-id="${t.id}">${icon('plan')}Reschedule</button>`
         : ''}
-      ${showActions && movable && t.status === 'skipped' && !t.dropped
+      ${showActions && t.status === 'skipped' && !t.dropped
         ? html`<button class="btn btn-sm btn-secondary reschedule-cta" data-action="reschedule" data-id="${t.id}">${icon('plan')}Reschedule to another day</button>`
         : ''}
-      ${showActions && movable && collapsed && t.status === 'todo'
+      ${showActions && collapsed && t.status === 'todo'
         ? html`<div class="task-more-actions" hidden><button class="btn btn-ghost btn-sm reschedule-btn" data-action="reschedule" data-id="${t.id}">${icon('plan')}Reschedule</button></div>`
         : ''}
       ${collapsed ? html`<button class="btn btn-ghost btn-sm expand-btn" data-action="expand" data-id="${t.id}" aria-expanded="false">Details</button>` : ''}
@@ -93,7 +91,7 @@ export function bindTaskActions(root) {
         await store.setTaskStatus(id, 'skipped');
         toast('Skipped.', { actionLabel: 'Undo', onAction: () => store.setTaskStatus(id, 'todo') });
       } else if (action === 'reschedule') {
-        await openReschedule(id);
+        await openReschedule([id]);
       } else if (action === 'toggle-done') {
         const t = store.state.tasks.find((x) => x.id === id);
         if (t) await store.setTaskStatus(id, t.status === 'done' ? 'todo' : 'done');
@@ -114,34 +112,41 @@ export function bindTaskActions(root) {
   });
 }
 
-/** Pick a new day for a task: quick picks for the next study days, or any date. */
-async function openReschedule(id) {
-  const task = store.state.tasks.find((t) => t.id === id);
-  if (!task) return;
+/**
+ * Pick a new day for one or more tasks: quick picks for the next study days, or any date.
+ * Days that fit everything come first, then days that nearly fit, then the rest.
+ */
+export async function openReschedule(ids, { title = 'Reschedule' } = {}) {
+  const tasks = ids.map((id) => store.state.tasks.find((t) => t.id === id)).filter(Boolean);
+  if (!tasks.length) return;
   const s = store.state.settings;
   const today = store.today();
-  const isFull = task.type === 'full_test';
-  // Days that fit the task come first, then days that nearly fit, then the rest; earliest first in each group.
+  const minutes = tasks.reduce((a, t) => a + (Number(t.minutes) || 0), 0);
+  const problemFor = (d) => tasks.map((t) => rescheduleProblem(t, d, today, s)).find(Boolean) || null;
   const candidates = [];
   for (let i = 0; i <= 21; i++) {
     const d = addDays(today, i);
-    if (rescheduleProblem(task, d, today, s)) continue;
+    if (problemFor(d)) continue;
     const free = freeMinutes(d, store.state.tasks, s);
-    const ratio = task.minutes ? free / task.minutes : 1;
+    const ratio = minutes ? free / minutes : 1;
     candidates.push({ date: d, free, cap: dayCapacity(d, s), group: ratio >= 1 ? 0 : ratio >= 0.75 ? 1 : 2, i });
   }
   const picks = candidates.sort((a, b) => a.group - b.group || a.i - b.i).slice(0, 5);
+  const one = tasks.length === 1 ? tasks[0] : null;
+  const summary = one
+    ? `${one.title}, ${fmtMinutes(one.minutes)}.${one.type === 'full_test' ? ' The full test moves to the new day with everything set up.' : one.type === 'redo' ? ' Your due redos move to that day.' : ''}`
+    : `${tasks.length} tasks, ${fmtMinutes(minutes)} in all. They all move to the day you pick.`;
   const chosen = await openSheet(
-    html`<h2>Reschedule</h2>
-      <p class="small muted">${task.title}, ${fmtMinutes(task.minutes)}.${isFull ? ' The full test moves to the new day with everything set up.' : ''}</p>
+    html`<h2>${title}</h2>
+      <p class="small muted">${summary}</p>
       ${picks.length
         ? html`<div class="list">${picks.map(
             (p) => html`<button class="list-item" data-close="${p.date}">
               <div class="grow"><div class="strong">${p.date === today ? 'Today' : formatDate(p.date)}</div>
-                <div class="small muted">${p.free >= task.minutes ? `${fmtMinutes(p.free)} free` : p.free ? `Only ${fmtMinutes(p.free)} free, it will run long` : p.cap ? 'Already full, it will run long' : 'Normally a day off'}</div></div>
+                <div class="small muted">${p.free >= minutes ? `${fmtMinutes(p.free)} free` : p.free ? `Only ${fmtMinutes(p.free)} free, it will run long` : p.cap ? 'Already full, it will run long' : 'Normally a day off'}</div></div>
               ${icon('chev', 'chev')}</button>`,
           )}</div>`
-        : html`<p class="small muted">No study days in the next three weeks. Pick a date below.</p>`}
+        : html`<p class="small muted">No open days in the next three weeks. Pick a date below.</p>`}
       <form class="stack" data-pick>
         <div class="field"><label for="rs-date">Or pick any day</label><input class="input" id="rs-date" type="date" name="date" min="${today}"></div>
         <p class="error-text" data-error hidden></p>
@@ -152,7 +157,7 @@ async function openReschedule(id) {
       form.addEventListener('submit', (e) => {
         e.preventDefault();
         const d = form.elements.date.value;
-        const problem = !isISODate(d) ? 'Pick a date.' : rescheduleProblem(task, d, today, s);
+        const problem = !isISODate(d) ? 'Pick a date.' : problemFor(d);
         if (problem) {
           const err = form.querySelector('[data-error]');
           err.textContent = problem;
@@ -165,9 +170,10 @@ async function openReschedule(id) {
   );
   if (!chosen) return;
   try {
-    const undo = await store.rescheduleTask(id, chosen);
-    undoToast(`Moved to ${chosen === today ? 'today' : formatDate(chosen)}.`, undo);
+    const { moved, skipped, undo } = await store.rescheduleTasks(tasks.map((t) => t.id), chosen);
+    const where = chosen === today ? 'today' : formatDate(chosen);
+    undoToast(tasks.length === 1 ? `Moved to ${where}.` : `Moved ${moved} task${moved === 1 ? '' : 's'} to ${where}.${skipped ? ` ${skipped} couldn't move.` : ''}`, undo);
   } catch (err) {
-    reportError(err, err.userMessage || "Couldn't move that task. Try again.");
+    reportError(err, err.userMessage || "Couldn't move that. Try again.");
   }
 }

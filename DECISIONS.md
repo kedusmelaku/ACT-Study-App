@@ -100,7 +100,6 @@ Judgment calls made without asking. One line each: what, then why.
 ## Bug sweep
 - A full test moved off a day and later moved back is rebuilt there; a "moved" record no longer blocks the day.
 - Heavy-night copies are pinned like rescheduled tasks, so a later plan rebuild (logging a miss, for example) no longer quietly replaces them.
-- Redo tasks can't be rescheduled, since redos stay due until answered and the plan adds them daily; moving one only duplicated it.
 - A pending or done "log the test" task stops the planner from adding a second one.
 - A full-test day that passed with no task at all (for example, the app was set up after that day) shows a reminder on Plan to add a new full-test day.
 - Reschedule suggestions include days with no study time set (useful for a Sunday full test), labeled "Normally a day off".
@@ -123,3 +122,7 @@ Judgment calls made without asking. One line each: what, then why.
 - `npm run fuzz` runs the season simulation: 48 seasons across settings variants, checking determinism, week bounds, no-study days, capacity, material reuse, Science limits, redo intervals, and text output.
 - A skipped or moved task's Reschedule button stays at full strength (only the task content fades), and skipping or un-skipping a full test rebuilds the week so the "log the test" task appears or disappears right away.
 - When a new version finishes downloading, a bar says "A new version is ready" with Reload and Later; the app also checks for updates each time it returns to the foreground. It never reloads on its own, so nothing being typed is lost.
+- Every task can be rescheduled, redo sessions included: moving a redo session postpones the redos it covered to the new day and pins one redo session there.
+- A day never gets a second redo session: one that's kept, skipped, moved, or rescheduled there stops the plan from adding another.
+- Today has "Move all of tonight to another day", which moves every task still open tonight (including skipped ones) to one chosen day, with Undo; Heavy night still spreads tonight across the week automatically.
+- Only full tests can go on a full-test day; other tasks are refused there.
