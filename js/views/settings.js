@@ -44,9 +44,9 @@ export function render(el) {
         <div class="section-title"><h2>Appearance</h2></div>
         <div class="card stack-sm">
           <div class="seg" role="group" aria-label="Theme">
-            ${['system', 'light', 'dark'].map((t) => html`<button type="button" data-theme-pick="${t}" aria-pressed="${getTheme() === t}">${{ system: 'Match phone', light: 'Light', dark: 'Dark' }[t]}</button>`)}
+            ${['system', 'light', 'dark'].map((t) => html`<button type="button" data-theme-pick="${t}" aria-pressed="${getTheme() === t}">${{ system: 'Match system', light: 'Light', dark: 'Dark' }[t]}</button>`)}
           </div>
-          <p class="hint">Match phone follows your phone's dark mode setting. Saved on this device only.</p>
+          <p class="hint">Match system follows your device's light or dark setting. Saved on this device only.</p>
         </div>
       </section>
 

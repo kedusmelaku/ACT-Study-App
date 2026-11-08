@@ -135,4 +135,4 @@ Judgment calls made without asking. One line each: what, then why.
 - Items deleted together (a test with its misses, redos, and pacing) share a group and restore as one.
 - Plan rebuilds record why they ran ("You logged or edited a test", "A new week started", "Synced with your other device"), and replaced tasks are listed but not restorable, since the new plan already covers that time.
 - Skipped tasks in History have a Reschedule button.
-- Appearance in Settings offers Match phone, Light, or Dark, saved on the device; a tiny script in the page head applies it before anything draws so there is no flash of the wrong theme.
+- Appearance in Settings offers Match system, Light, or Dark, saved on the device; a tiny script in the page head applies it before anything draws so there is no flash of the wrong theme.
