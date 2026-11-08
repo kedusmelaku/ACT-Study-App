@@ -128,3 +128,11 @@ Judgment calls made without asking. One line each: what, then why.
 - Only full tests can go on a full-test day; other tasks are refused there.
 - Plan has a week strip on top (one tile per day: a colored bar per task, solid when done, minutes left) so the whole week is visible on a phone, and tapping a tile jumps to that day.
 - Plan offers List or Board, remembered on the device. Board shows day columns: all seven across on a laptop, about one and a half at a time on a phone with swipe and snap, opening on today. Tapping a board card opens the full task with Done, Skip, and Reschedule.
+
+## History and theme
+- A History screen (More, History) lists skipped, moved, and Heavy-night-dropped tasks from the last 8 weeks, deleted misses and tests, and every plan update that replaced unfinished tasks, with the reason.
+- Deletes keep a copy of what was removed inside the sync tombstone for 30 days, so History can explain and restore it on any synced device; after that only the bare tombstone stays.
+- Items deleted together (a test with its misses, redos, and pacing) share a group and restore as one.
+- Plan rebuilds record why they ran ("You logged or edited a test", "A new week started", "Synced with your other device"), and replaced tasks are listed but not restorable, since the new plan already covers that time.
+- Skipped tasks in History have a Reschedule button.
+- Appearance in Settings offers Match phone, Light, or Dark, saved on the device; a tiny script in the page head applies it before anything draws so there is no flash of the wrong theme.

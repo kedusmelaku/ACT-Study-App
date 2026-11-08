@@ -140,7 +140,7 @@ export function onLocalWrite(fn) {
 
 /**
  * Several writes in one transaction.
- * ops: [{ store, type: 'put' | 'delete', value?, key?, fromSync?, raw? }]
+ * ops: [{ store, type: 'put' | 'delete', value?, key?, fromSync?, raw?, trash?, reason?, group?, note? }]
  * raw: write the value exactly as given (used by the one-time upgrade).
  * 'delete' writes a tombstone so the delete syncs.
  */
@@ -163,7 +163,15 @@ export async function batch(ops) {
     }
     local = true;
     if (op.type === 'put') os.put({ ...op.value, updatedAt: now, _localAt: now });
-    else if (op.type === 'delete') os.put({ ...tombstone(op.store, op.key, now), _localAt: now });
+    else if (op.type === 'delete') {
+      // A tombstone can keep what was deleted (`trash`), so History can explain it and offer Restore.
+      const extra = {};
+      if (op.trash) {
+        const { _localAt: _a, trash: _t, trashReason: _r, trashGroup: _g, trashNote: _n, deleted: _d, ...kept } = op.trash;
+        Object.assign(extra, { trash: kept, trashReason: op.reason || '', trashGroup: op.group || '', trashNote: op.note || '' });
+      }
+      os.put({ ...tombstone(op.store, op.key, now), ...extra, _localAt: now });
+    }
   }
   await done(tx);
   if (channel) channel.postMessage('changed');

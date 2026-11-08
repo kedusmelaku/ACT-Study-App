@@ -12,6 +12,7 @@ export function render(el) {
     { href: '#/redo', icon: 'redo', title: 'Redo', sub: due ? `${due} due now` : 'Spaced review of old misses' },
     { href: '#/explain', icon: 'explain', title: 'Explain a miss', sub: 'Ask Claude why the right answer is right' },
     { href: '#/progress', icon: 'progress', title: 'Progress', sub: 'Trends, topics, causes, weekly coach' },
+    { href: '#/history', icon: 'clock', title: 'History', sub: 'Skipped, moved, and deleted things, with restore' },
     { href: '#/settings', icon: 'settings', title: 'Settings', sub: 'Dates, study time, materials, backup' },
   ];
   setHTML(

@@ -8,7 +8,7 @@ import { generateWeek, heavyNight as planHeavyNight, rescheduleTask as planResch
 import { createRedo, answerRedo as logicAnswerRedo } from './logic/redo.js';
 import { todayISO, isISODate, dateOf } from './logic/dates.js';
 import { weekStartFor } from './logic/phase.js';
-import { incomingWrites, isSyncedSetting } from './logic/sync.js';
+import { incomingWrites, isSyncedSetting, KEY_PATHS } from './logic/sync.js';
 
 export const state = {
   ready: false,
@@ -148,6 +148,7 @@ async function upgradeForSync(all) {
 
 export async function init() {
   const all = await upgradeForSync(await db.loadAll());
+  pruneTrash(all).catch((e) => console.error(e));
   loadState(all);
   const stored = all.settings.find((s) => s.id === 'settings');
   state.settings = withDefaults(stored);
@@ -166,7 +167,7 @@ async function reloadFromDB() {
 // ---------------------------------------------------------------- plan
 
 /** Regenerate the current week. Done and skipped tasks are never rewritten. */
-export async function regenerate() {
+export async function regenerate(reason = 'The plan updated') {
   // Data may have changed since the focus was last computed (a new test, misses, a sync), so recompute it.
   cache.focus = null;
   const weekStart = currentWeekStart();
@@ -185,7 +186,11 @@ export async function regenerate() {
   const beforeById = new Map(before.map((t) => [t.id, t]));
   const keep = new Set(tasks.map((t) => t.id));
   const ops = [];
-  for (const t of before) if (!keep.has(t.id)) ops.push({ store: 'tasks', type: 'delete', key: t.id });
+  // Replaced tasks keep a note in History saying why, so a changed plan never looks like lost work.
+  const planGroup = `plan-${weekStart}-${db.stampNow()}`;
+  for (const t of before) {
+    if (!keep.has(t.id)) ops.push({ store: 'tasks', type: 'delete', key: t.id, trash: t, reason: 'plan', group: planGroup, note: reason });
+  }
   // Only write tasks that actually changed, so a regeneration doesn't look like new edits to sync.
   for (const t of tasks) if (!sameTask(beforeById.get(t.id), t)) ops.push({ store: 'tasks', type: 'put', value: t });
   state.settings = { ...state.settings, planWeek: weekStart, planNotes: notes };
@@ -208,15 +213,15 @@ export async function ensureWeek() {
   const ws = currentWeekStart();
   const hasWeek = state.tasks.some((t) => t.weekStart === ws);
   if (state.settings.planWeek !== ws || !hasWeek) {
-    await regenerate();
+    await regenerate('A new week started');
     emit();
     return true;
   }
   return false;
 }
 
-async function regenerateAndEmit() {
-  if (state.settings.onboarded) await regenerate();
+async function regenerateAndEmit(reason) {
+  if (state.settings.onboarded) await regenerate(reason);
   emit();
 }
 
@@ -225,7 +230,7 @@ async function regenerateAndEmit() {
 export async function saveSettings(patch, { regen = false } = {}) {
   state.settings = nextSettings(patch);
   await db.put('settings', state.settings);
-  if (regen) await regenerateAndEmit();
+  if (regen) await regenerateAndEmit('You changed a setting');
   else emit();
 }
 
@@ -276,9 +281,11 @@ export async function saveAttempt({ attempt, pacing = [], misses = [] }) {
   const existingMisses = state.misses.filter((m) => m.attemptId === attempt.id);
   const incomingIds = new Set(misses.map((m) => m.id));
   const removed = existingMisses.filter((m) => !incomingIds.has(m.id));
+  const editGroup = newId('del');
   for (const m of removed) {
-    ops.push({ store: 'misses', type: 'delete', key: m.id });
-    ops.push({ store: 'redos', type: 'delete', key: m.id });
+    ops.push({ store: 'misses', type: 'delete', key: m.id, trash: m, reason: 'test-edit', group: editGroup });
+    const r = redoFor(m.id);
+    ops.push({ store: 'redos', type: 'delete', key: m.id, trash: r || undefined, reason: 'test-edit', group: editGroup });
   }
   const savedMisses = misses.map((m) => cleanMiss({ ...m, attemptId: attempt.id, sourceId: attempt.sourceId, date: attempt.date }));
   const newRedos = [];
@@ -315,7 +322,7 @@ export async function saveAttempt({ attempt, pacing = [], misses = [] }) {
   state.materialUse = [...state.materialUse.filter((u) => u.attemptId !== attempt.id), ...use];
   const doneIds = new Map(doneTasks.map((t) => [t.id, t]));
   state.tasks = state.tasks.map((t) => doneIds.get(t.id) || t);
-  await regenerateAndEmit();
+  await regenerateAndEmit('You logged or edited a test');
 }
 
 /** Delete an attempt with its pacing and misses. Returns an undo function. */
@@ -327,18 +334,21 @@ export async function deleteAttempt(id) {
   const missIds = new Set(misses.map((m) => m.id));
   const redos = state.redos.filter((r) => missIds.has(r.missId));
   const use = state.materialUse.filter((u) => u.attemptId === id);
-  const ops = [{ store: 'attempts', type: 'delete', key: id }];
-  for (const p of pacing) ops.push({ store: 'pacing', type: 'delete', key: p.id });
-  for (const m of misses) ops.push({ store: 'misses', type: 'delete', key: m.id });
-  for (const r of redos) ops.push({ store: 'redos', type: 'delete', key: r.missId });
-  for (const u of use) ops.push({ store: 'materialUse', type: 'delete', key: u.id });
+  // Everything deleted together shares a group, so History restores the test as one piece.
+  const group = newId('del');
+  const del = (storeName, key, record) => ({ store: storeName, type: 'delete', key, trash: record, reason: 'deleted-test', group });
+  const ops = [del('attempts', id, attempt)];
+  for (const p of pacing) ops.push(del('pacing', p.id, p));
+  for (const m of misses) ops.push(del('misses', m.id, m));
+  for (const r of redos) ops.push(del('redos', r.missId, r));
+  for (const u of use) ops.push(del('materialUse', u.id, u));
   await db.batch(ops);
   state.attempts = state.attempts.filter((a) => a.id !== id);
   state.pacing = state.pacing.filter((p) => p.attemptId !== id);
   state.misses = state.misses.filter((m) => !missIds.has(m.id));
   state.redos = state.redos.filter((r) => !missIds.has(r.missId));
   state.materialUse = state.materialUse.filter((u) => u.attemptId !== id);
-  await regenerateAndEmit();
+  await regenerateAndEmit('You deleted a test');
   return async () => {
     const restore = [{ store: 'attempts', type: 'put', value: attempt }];
     for (const p of pacing) restore.push({ store: 'pacing', type: 'put', value: p });
@@ -351,7 +361,7 @@ export async function deleteAttempt(id) {
     state.misses.push(...misses);
     state.redos.push(...redos);
     state.materialUse.push(...use);
-    await regenerateAndEmit();
+    await regenerateAndEmit('You restored a test');
   };
 }
 
@@ -366,7 +376,7 @@ export async function addMiss(input) {
   ]);
   state.misses.push(miss);
   state.redos.push(redo);
-  await regenerateAndEmit();
+  await regenerateAndEmit('You added a miss');
   return miss;
 }
 
@@ -383,9 +393,10 @@ export async function deleteMiss(id) {
   const miss = state.misses.find((m) => m.id === id);
   if (!miss) return null;
   const redo = redoFor(id);
+  const group = newId('del');
   await db.batch([
-    { store: 'misses', type: 'delete', key: id },
-    { store: 'redos', type: 'delete', key: id },
+    { store: 'misses', type: 'delete', key: id, trash: miss, reason: 'deleted-miss', group },
+    { store: 'redos', type: 'delete', key: id, trash: redo || undefined, reason: 'deleted-miss', group },
   ]);
   state.misses = state.misses.filter((m) => m.id !== id);
   state.redos = state.redos.filter((r) => r.missId !== id);
@@ -449,7 +460,7 @@ export async function setTaskStatus(id, status) {
   const removeIds = new Set(removeUse.map((u) => u.id));
   state.materialUse = [...state.materialUse.filter((u) => !removeIds.has(u.id) && !addUse.some((a) => a.id === u.id)), ...addUse];
   // Skipping or un-skipping a full test changes what the rest of the week needs (the "log the test" task).
-  if (t.type === 'full_test') await regenerateAndEmit();
+  if (t.type === 'full_test') await regenerateAndEmit(status === 'skipped' ? 'You skipped a full test' : 'You changed a full test');
   else emit();
 }
 
@@ -494,7 +505,7 @@ export async function rescheduleTasks(ids, toDate) {
   await db.batch(ops);
   const copyIds = new Set(copies.map((c) => c.id));
   state.tasks = [...state.tasks.filter((t) => !copyIds.has(t.id)).map((t) => originals.get(t.id) || t), ...copies];
-  await regenerateAndEmit();
+  await regenerateAndEmit('You rescheduled a task');
   const undo = async () => {
     const undoOps = before.tasks.map((t) => ({ store: 'tasks', type: 'put', value: t }));
     for (const c of copies) undoOps.push({ store: 'tasks', type: 'delete', key: c.id });
@@ -508,7 +519,7 @@ export async function rescheduleTasks(ids, toDate) {
     state.tasks = state.tasks.filter((t) => !copyIds.has(t.id)).map((t) => restored.get(t.id) || t);
     const oldRedos = new Map(before.redos.map((r) => [r.missId, r]));
     state.redos = state.redos.map((r) => oldRedos.get(r.missId) || r);
-    await regenerateAndEmit();
+    await regenerateAndEmit('You undid a reschedule');
   };
   return { moved: originals.size, skipped: ids.length - originals.size, undo };
 }
@@ -571,7 +582,7 @@ export async function undoHeavyNight() {
   ops.push({ store: 'settings', type: 'put', value: state.settings });
   await db.batch(ops);
   state.tasks = next;
-  await regenerateAndEmit();
+  await regenerateAndEmit('You undid a heavy night');
 }
 
 // ---------------------------------------------------------------- coach notes
@@ -593,8 +604,66 @@ export async function exportBackup() {
 export async function importBackup(obj, mode) {
   await db.importData(obj, mode);
   await reloadFromDB();
-  if (state.settings.onboarded) await regenerate();
+  if (state.settings.onboarded) await regenerate('You imported a backup');
   emit();
+}
+
+// ---------------------------------------------------------------- history
+
+export const TRASH_DAYS = 30;
+
+/**
+ * Deleted and replaced items still remembered, newest first, grouped by what removed them.
+ * Returns [{ group, reason, note, at, items: [{ store, key, record }] }].
+ */
+export async function loadTrash() {
+  const all = await db.loadAll();
+  const groups = new Map();
+  const now = Date.now();
+  for (const [name, rows] of Object.entries(all)) {
+    if (name === 'settings') continue;
+    for (const r of rows) {
+      if (!r.deleted || !r.trash) continue;
+      if (now - Date.parse(r.updatedAt || 0) > TRASH_DAYS * 86400000) continue;
+      const g = r.trashGroup || `${name}:${r.updatedAt}`;
+      if (!groups.has(g)) groups.set(g, { group: g, reason: r.trashReason || '', note: r.trashNote || '', at: r.updatedAt, items: [] });
+      const entry = groups.get(g);
+      if (r.updatedAt > entry.at) entry.at = r.updatedAt;
+      entry.items.push({ store: name, key: r[KEY_PATHS[name]], record: r.trash });
+    }
+  }
+  return [...groups.values()].sort((a, b) => String(b.at).localeCompare(String(a.at)));
+}
+
+/** Put back everything deleted together (a miss with its redo, or a test with its misses). */
+export async function restoreDeleted(group) {
+  const all = await db.loadAll();
+  const ops = [];
+  for (const [name, rows] of Object.entries(all)) {
+    if (name === 'settings' || name === 'tasks') continue;
+    for (const r of rows) if (r.deleted && r.trash && r.trashGroup === group) ops.push({ store: name, type: 'put', value: r.trash });
+  }
+  if (!ops.length) return 0;
+  await db.batch(ops);
+  await reloadFromDB();
+  await regenerateAndEmit('You restored deleted items');
+  return ops.length;
+}
+
+/** Old deleted items lose their saved copy after TRASH_DAYS; the tombstone stays so sync still works. */
+async function pruneTrash(all) {
+  const ops = [];
+  const cutoff = Date.now() - TRASH_DAYS * 86400000;
+  for (const [name, rows] of Object.entries(all)) {
+    if (name === 'settings') continue;
+    for (const r of rows) {
+      if (r.deleted && r.trash && Date.parse(r.updatedAt || 0) < cutoff) {
+        const { trash, trashReason, trashGroup, trashNote, ...rest } = r;
+        ops.push({ store: name, type: 'put', value: rest, raw: true });
+      }
+    }
+  }
+  if (ops.length) await db.batch(ops);
 }
 
 // ---------------------------------------------------------------- sync
@@ -616,7 +685,7 @@ export async function applySync(records, syncPatch, { forceSettings = null } = {
   await reloadFromDB();
   // Always rebuild after a sync: the plan must match the merged data even when this pull was empty but an
   // earlier one changed it. Unchanged tasks aren't rewritten, so this doesn't create new uploads.
-  if (state.settings.onboarded) await regenerate();
+  if (state.settings.onboarded) await regenerate('Synced with your other device');
   emit();
   return { applied: puts.length + Object.keys(settingsPatch).length };
 }

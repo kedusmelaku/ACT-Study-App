@@ -231,3 +231,35 @@ export function chatPanel({ prompt, title, steps, replyLabel, submitLabel, reply
     </div>
   </section>`;
 }
+
+// ---------------------------------------------------------------- theme
+
+const THEME_KEY = 'act-prep-theme';
+const THEME_COLORS = { light: '#f5f4f0', dark: '#111215' };
+
+/** 'system', 'light', or 'dark'. Saved on this device only. */
+export function getTheme() {
+  try {
+    const t = localStorage.getItem(THEME_KEY);
+    return t === 'light' || t === 'dark' ? t : 'system';
+  } catch {
+    return 'system';
+  }
+}
+
+export function setTheme(theme) {
+  try {
+    if (theme === 'system') localStorage.removeItem(THEME_KEY);
+    else localStorage.setItem(THEME_KEY, theme);
+  } catch {
+    /* the choice just won't be remembered */
+  }
+  const root = document.documentElement;
+  if (theme === 'light' || theme === 'dark') root.setAttribute('data-theme', theme);
+  else root.removeAttribute('data-theme');
+  const metas = document.querySelectorAll('meta[name="theme-color"]');
+  metas.forEach((m) => {
+    const media = m.getAttribute('media') || '';
+    m.setAttribute('content', THEME_COLORS[theme] || (media.includes('dark') ? THEME_COLORS.dark : THEME_COLORS.light));
+  });
+}

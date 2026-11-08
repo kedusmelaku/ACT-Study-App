@@ -18,6 +18,7 @@ import * as onboarding from './views/onboarding.js';
 import * as redo from './views/redo.js';
 import * as progress from './views/progress.js';
 import * as explain from './views/explain.js';
+import * as historyView from './views/history.js';
 
 const ROUTES = [
   { pattern: /^\/?$/, view: today, tab: 'today' },
@@ -35,6 +36,7 @@ const ROUTES = [
   { pattern: /^\/explain$/, view: explain, tab: 'more', sub: 'explain' },
   { pattern: /^\/progress$/, view: progress, tab: 'more', sub: 'progress' },
   { pattern: /^\/settings$/, view: settings, tab: 'more', sub: 'settings' },
+  { pattern: /^\/history$/, view: historyView, tab: 'more', sub: 'history' },
   { pattern: /^\/onboarding$/, view: onboarding, tab: null },
 ];
 
@@ -49,6 +51,7 @@ const MORE = [
   { id: 'redo', label: 'Redo', href: '#/redo', icon: 'redo' },
   { id: 'explain', label: 'Explain', href: '#/explain', icon: 'explain' },
   { id: 'progress', label: 'Progress', href: '#/progress', icon: 'progress' },
+  { id: 'history', label: 'History', href: '#/history', icon: 'clock' },
   { id: 'settings', label: 'Settings', href: '#/settings', icon: 'settings' },
 ];
 

@@ -1,7 +1,7 @@
 // Settings: test dates, study time, full-test days, busy days, materials, topics, Claude passcode, backup.
 import { html, setHTML, safeUrl } from '../safe-html.js';
 import * as store from '../store.js';
-import { icon, topbar, toast, reportError, openSheet, fmtMinutes, notice, plural } from '../ui.js';
+import { icon, topbar, toast, reportError, openSheet, fmtMinutes, notice, plural, getTheme, setTheme } from '../ui.js';
 import { DAY_NAMES } from '../data/calendar.js';
 import { SECTIONS, ALL_SECTIONS } from '../data/act.js';
 import { SEED_MATERIALS } from '../data/materials.js';
@@ -39,6 +39,16 @@ export function render(el) {
     el,
     html`${topbar('Settings', { back: '#/more' })}
     <div class="stack-lg">
+
+      <section class="stack" id="appearance">
+        <div class="section-title"><h2>Appearance</h2></div>
+        <div class="card stack-sm">
+          <div class="seg" role="group" aria-label="Theme">
+            ${['system', 'light', 'dark'].map((t) => html`<button type="button" data-theme-pick="${t}" aria-pressed="${getTheme() === t}">${{ system: 'Match phone', light: 'Light', dark: 'Dark' }[t]}</button>`)}
+          </div>
+          <p class="hint">Match phone follows your phone's dark mode setting. Saved on this device only.</p>
+        </div>
+      </section>
 
       <section class="stack" id="dates">
         <div class="section-title"><h2>Test dates</h2></div>
@@ -284,6 +294,12 @@ function bind(el) {
       const cur = Number(s.availability[d]) || 0;
       const next = Math.max(0, Math.min(300, cur + dir * STEP));
       return save({ availability: { ...s.availability, [d]: next } });
+    }
+    const th = e.target.closest('[data-theme-pick]');
+    if (th) {
+      setTheme(th.dataset.themePick);
+      el.querySelectorAll('[data-theme-pick]').forEach((b) => b.setAttribute('aria-pressed', String(b === th)));
+      return;
     }
     const cm = e.target.closest('[data-claude-mode]');
     if (cm) {
