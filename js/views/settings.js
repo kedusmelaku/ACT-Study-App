@@ -45,9 +45,6 @@ export function render(el) {
         <div class="card stack-sm">
           <div class="seg" role="group" aria-label="Theme">
             ${['system', 'light', 'dark'].map((t) => html`<button type="button" data-theme-pick="${t}" aria-pressed="${getTheme() === t}">${{ system: 'Match system', light: 'Light', dark: 'Dark' }[t]}</button>`)}
-          </div>
-          <p class="hint">Match system follows your device's light or dark setting. Saved on this device only.</p>
-        </div>
       </section>
 
       <section class="stack" id="dates">
