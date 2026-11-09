@@ -1,8 +1,8 @@
-import { defaultSettings } from '../js/data/calendar.js';
+import { defaultSettings, december2026Preset } from '../js/data/calendar.js';
 import { buildMaterials } from '../js/data/materials.js';
 
 export function settings(overrides = {}) {
-  return { ...defaultSettings(), timezone: 'America/Chicago', ...overrides };
+  return { ...defaultSettings(), ...december2026Preset(), timezone: 'America/Chicago', ...overrides };
 }
 
 export function materials(s = settings()) {

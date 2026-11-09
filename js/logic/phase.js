@@ -1,6 +1,6 @@
 // Calendar phases: what kind of day a date is, and how many minutes it has. Pure functions.
 import { TAPER, WEEK_START_DAY } from '../data/calendar.js';
-import { dayOfWeek, daysBetween, weekStartOf, compareDates, isISODate } from './dates.js';
+import { dayOfWeek, daysBetween, weekStartOf, compareDates, isISODate, addDays } from './dates.js';
 
 export function sortedTestDates(settings) {
   return (settings.testDates || [])
@@ -96,4 +96,22 @@ export function pendingRealScores(settings, attempts, today) {
 
 function hasRealOnOrAfter(attempts, date) {
   return attempts.some((a) => a.kind === 'real' && compareDates(a.date, date) >= 0);
+}
+
+/**
+ * Full-test days for a new test date: the first Saturday from today (a diagnostic), and the Saturday
+ * two weeks before the taper. Only days at least 10 days apart and before the taper are kept.
+ * sourceIds are suggestions; the planner swaps in the next unused full test if one is used up.
+ */
+export function defaultFullTests(testDate, today, sourceIds = ['enhanced-1', 'enhanced-2']) {
+  if (!isISODate(testDate) || compareDates(testDate, today) <= 0) return [];
+  const taperStart = addDays(testDate, -7);
+  const firstSat = addDays(today, (6 - dayOfWeek(today) + 7) % 7);
+  const out = [];
+  if (compareDates(firstSat, taperStart) < 0) out.push({ date: firstSat, sourceId: sourceIds[0] || null });
+  const second = weekStartOf(addDays(taperStart, -7), WEEK_START_DAY);
+  if (compareDates(second, today) >= 0 && compareDates(second, taperStart) < 0 && (!out.length || daysBetween(out[0].date, second) >= 10)) {
+    out.push({ date: second, sourceId: sourceIds[out.length] || null });
+  }
+  return out;
 }

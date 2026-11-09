@@ -1,13 +1,15 @@
 // Settings: test dates, study time, full-test days, busy days, materials, topics, Claude passcode, backup.
 import { html, setHTML, safeUrl } from '../safe-html.js';
 import * as store from '../store.js';
-import { icon, topbar, toast, reportError, openSheet, fmtMinutes, notice, plural, getTheme, setTheme } from '../ui.js';
+import { icon, topbar, toast, reportError, openSheet, fmtMinutes, notice, plural, getTheme, setTheme, copyText } from '../ui.js';
 import { DAY_NAMES } from '../data/calendar.js';
 import { SECTIONS, ALL_SECTIONS } from '../data/act.js';
 import { SEED_MATERIALS } from '../data/materials.js';
 import { formatDate, isISODate, compareDates, dateOf } from '../logic/dates.js';
+import { defaultFullTests } from '../logic/phase.js';
 import { validateImport } from '../db.js';
-import { syncNow, enableSync, disableSync } from '../sync.js';
+import { syncNow, createSyncSpace, joinSync, disableSync } from '../sync.js';
+import { formatSyncCode } from '../logic/sync.js';
 
 export const live = true;
 
@@ -81,7 +83,7 @@ export function render(el) {
               <div class="grow"><div class="strong">${formatDate(d, { year: true })}</div><div class="small muted">${Number(m) ? `${fmtMinutes(Number(m))} only` : 'No study'}</div></div>
               <button class="icon-btn" data-action="remove-busy" data-date="${d}" aria-label="Remove busy day">${icon('trash')}</button></div>`,
           )}
-          <button class="list-item" data-action="add-busy"><span class="list-icon">${icon('plus')}</span><div class="grow"><div class="strong">Mark a busy day</div><div class="small muted">For example, an APUSH test day</div></div></button>
+          <button class="list-item" data-action="add-busy"><span class="list-icon">${icon('plus')}</span><div class="grow"><div class="strong">Mark a busy day</div><div class="small muted">For example, a big test or game day</div></div></button>
         </div>
       </section>
 
@@ -217,22 +219,32 @@ function ago(iso) {
   return formatDate(dateOf(iso));
 }
 
+let showCode = false;
+
 function syncCard(s) {
   const sync = s.sync || {};
-  if (!sync.enabled) {
-    return html`<form class="card stack" data-sync-form>
-      <p class="small muted">Keep your devices in step. Needs the sync database set up in Vercel (see the README).</p>
-      <div class="field"><label for="sync-pass">App passcode</label>
-        <input class="input" id="sync-pass" name="passcode" type="password" autocomplete="current-password" maxlength="200" value="${s.passcode || ''}" placeholder="The APP_PASSCODE you set in Vercel"></div>
-      <p class="hint">Same passcode on every device.</p>
-      <button class="btn" type="submit">Turn on sync</button>
-    </form>`;
+  if (!sync.enabled || !sync.code) {
+    return html`<div class="card stack">
+      ${sync.enabled && !sync.code ? notice('info', 'Sync now uses a personal sync code. Start it again on the device that has your data.') : ''}
+      <p class="small muted">Keep your devices in step with a private sync code.</p>
+      <div class="fab-row">
+        <button class="btn" data-action="sync-start">Start syncing</button>
+        <button class="btn btn-secondary" data-action="sync-join">Join with a code</button>
+      </div>
+    </div>`;
   }
+  const code = formatSyncCode(sync.code);
   return html`<div class="card stack">
     <div class="spread"><div><div class="strong">${sync.lastError ? 'Not synced' : 'Synced'}</div><div class="small muted">Last sync ${ago(sync.lastSyncAt)}</div></div>
       <button class="btn btn-sm btn-secondary" data-action="sync-now">Sync now</button></div>
     ${sync.lastError ? notice('warn', sync.lastError) : ''}
-    <p class="hint">Syncs on its own. Works offline.</p>
+    <div class="stack-sm">
+      <span class="label">Your sync code</span>
+      <code class="sync-code ${showCode ? '' : 'is-masked'}">${showCode ? code : `Ends in ${code.slice(-4)}`}</code>
+      <div class="row"><button class="btn btn-sm btn-secondary" data-action="sync-show">${showCode ? 'Hide' : 'Show'}</button>
+        <button class="btn btn-sm btn-secondary" data-action="sync-copy">Copy</button></div>
+      <p class="hint">Enter it on your other devices. Anyone with it can see your data.</p>
+    </div>
     <button class="btn btn-ghost btn-sm" data-action="sync-off">Turn off sync on this device</button>
   </div>`;
 }
@@ -252,7 +264,7 @@ function dateSheet({ title, withMinutes = false, minutesLabel = 'Minutes', defau
     html`<h2>${title}</h2>
       <form class="stack" data-sheet-form>
         <div class="field"><label>Date</label><input class="input" type="date" name="date" required></div>
-        ${withLabel ? html`<div class="field"><label>Label</label><input class="input" name="label" maxlength="40" placeholder="e.g. April school-day ACT"></div>` : ''}
+        ${withLabel ? html`<div class="field"><label>Label</label><input class="input" name="label" maxlength="40" placeholder="e.g. Spring ACT"></div>` : ''}
         ${withMinutes ? html`<div class="field"><label>${minutesLabel}</label><input class="input" type="number" name="minutes" min="0" max="480" step="15" value="${defaultMinutes}"></div>` : ''}
         ${withSource
           ? html`<div class="field"><label>Test</label><select class="input" name="sourceId">${mats.map((m) => html`<option value="${m.sourceId}">${m.title}</option>`)}</select></div>`
@@ -323,7 +335,15 @@ function bind(el) {
       if (!r) return;
       const list = (s.testDates || []).filter((t) => t.date !== r.date);
       list.push({ date: r.date, label: r.label || 'ACT', science: true });
-      return save({ testDates: list }, true, 'Test date added. The plan now aims at your next test.');
+      const patch = { testDates: list };
+      // No full tests coming up: add two for this date (the planner picks unused practice tests).
+      const upcoming = (s.fullTests || []).filter((f) => f.date >= store.today());
+      let added = [];
+      if (!upcoming.length) {
+        added = defaultFullTests(r.date, store.today(), [null, null]);
+        patch.fullTests = [...(s.fullTests || []), ...added];
+      }
+      return save(patch, true, added.length ? `Test date added, with ${added.length} full-test day${added.length === 1 ? '' : 's'}.` : 'Test date added.');
     }
     if (a === 'remove-test') return save({ testDates: (s.testDates || []).filter((t) => t.date !== b.dataset.date) });
     if (a === 'add-busy') {
@@ -366,6 +386,33 @@ function bind(el) {
       }
       return;
     }
+    if (a === 'sync-start') {
+      b.disabled = true;
+      b.textContent = 'Starting';
+      const { problem } = await createSyncSpace();
+      showCode = true;
+      toast(problem || 'Sync is on. Copy your code to your other devices.');
+      return;
+    }
+    if (a === 'sync-join') {
+      const problem = await joinSheet();
+      if (problem === null) toast('Joined. Your data is syncing.');
+      return;
+    }
+    if (a === 'sync-show') {
+      showCode = !showCode;
+      const code = formatSyncCode(store.state.settings.sync.code);
+      const box = el.querySelector('.sync-code');
+      box.textContent = showCode ? code : `Ends in ${code.slice(-4)}`;
+      box.classList.toggle('is-masked', !showCode);
+      b.textContent = showCode ? 'Hide' : 'Show';
+      return;
+    }
+    if (a === 'sync-copy') {
+      const ok = await copyText(formatSyncCode(store.state.settings.sync.code));
+      toast(ok ? 'Sync code copied.' : "Couldn't copy. Tap Show and copy it by hand.");
+      return;
+    }
     if (a === 'sync-off') {
       await disableSync();
       toast('Sync is off on this device. Your data stays here.');
@@ -397,21 +444,6 @@ function bind(el) {
   });
 
   el.addEventListener('submit', async (e) => {
-    const sf = e.target.closest('[data-sync-form]');
-    if (sf) {
-      e.preventDefault();
-      const pass = sf.elements.passcode.value.trim();
-      if (!pass) {
-        toast('Enter the app passcode first.');
-        return;
-      }
-      const btn = sf.querySelector('[type=submit]');
-      btn.disabled = true;
-      btn.textContent = 'Connecting';
-      const problem = await enableSync(pass);
-      toast(problem || 'Sync is on.');
-      return;
-    }
     const f = e.target.closest('[data-passcode-form]');
     if (!f) return;
     e.preventDefault();
@@ -470,4 +502,37 @@ async function doImport(file) {
   } catch (err) {
     reportError(err, "Couldn't import that backup. Nothing was changed.");
   }
+}
+
+/** Ask for a sync code and join that space. Resolves to null on success, a message on failure, or undefined if cancelled. */
+export function joinSheet() {
+  return openSheet(
+    html`<h2>Join with a code</h2>
+      <p class="small muted">Enter the sync code from your other device (Settings, Sync).</p>
+      <form class="stack" data-join>
+        <input class="input sync-code-input" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" required>
+        <p class="error-text" data-error hidden></p>
+        <div class="sheet-actions"><button type="button" class="btn btn-secondary" data-close="">Cancel</button><button class="btn" type="submit">Join</button></div>
+      </form>`,
+    (root, close) => {
+      const form = root.querySelector('[data-join]');
+      setTimeout(() => form.elements.code.focus(), 50);
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = form.querySelector('[type=submit]');
+        const err = form.querySelector('[data-error]');
+        btn.disabled = true;
+        btn.textContent = 'Joining';
+        const problem = await joinSync(form.elements.code.value);
+        btn.disabled = false;
+        btn.textContent = 'Join';
+        if (problem) {
+          err.textContent = problem;
+          err.hidden = false;
+          return;
+        }
+        close(null);
+      });
+    },
+  ).then((v) => (v === null ? null : undefined));
 }

@@ -693,3 +693,7 @@ summary { cursor: pointer; min-height: 32px; display: list-item; }
 
 .reminder { display: flex; gap: 12px; align-items: flex-start; padding: 14px 8px 14px 14px; }
 .reminder .icon-btn { margin-top: -6px; }
+
+.sync-code { font-family: var(--mono); font-size: 1.05rem; letter-spacing: 0.04em; background: var(--surface-2); padding: 10px 12px; border-radius: 10px; white-space: nowrap; display: block; text-align: center; }
+.sync-code.is-masked { font-family: var(--font); letter-spacing: 0; color: var(--muted); }
+.sync-code-input { font-family: var(--mono); letter-spacing: 0.08em; text-transform: uppercase; }

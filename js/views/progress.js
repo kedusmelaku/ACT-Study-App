@@ -80,7 +80,7 @@ function topicsCard(topics) {
 }
 
 function superscoreCard(sup) {
-  if (!sup) return html`<section class="card card-soft stack-sm"><h3>Superscore</h3><p class="small muted">Built from real ACT attempts only. Log your December scores when they're released.</p></section>`;
+  if (!sup) return html`<section class="card card-soft stack-sm"><h3>Superscore</h3><p class="small muted">Built from real ACT attempts only. Log your scores when they're released.</p></section>`;
   return html`<section class="card stack">
     <div class="spread"><div><div class="tiny strong muted">SUPERSCORE</div><div class="small muted">Best section from ${plural(sup.count, 'real ACT')}</div></div><div class="score-big">${sup.composite ?? '--'}</div></div>
     <div class="score-row">${ALL_SECTIONS.map((s) => {

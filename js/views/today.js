@@ -115,7 +115,7 @@ export function render(el) {
     </a>`);
   }
   if (!target && !pending) {
-    reminders.push(notice('info', html`The plan is in open-ended mode. <a href="#/settings">Add your next test date</a> (for example, the April school-day ACT).`));
+    reminders.push(notice('info', html`The plan is in open-ended mode. <a href="#/settings">Add your next test date</a>.`));
   }
   // Weekly coach reminder: once per plan week, until the note is saved or the reminder is dismissed.
   const coachId = `coach-${ws}`;

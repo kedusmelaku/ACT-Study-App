@@ -1,7 +1,7 @@
 // POST /api/explain: explain one missed ACT question. Images are passed through and never stored.
 import { guard, send } from './_auth.js';
 import { callClaude } from './_claude.js';
-import { EXPLAIN_SYSTEM, SECTION_KEYS, explainDetails, parseJsonReply, normalizeExplain } from '../js/logic/claude-format.js';
+import { EXPLAIN_SYSTEM, explainSystem, SECTION_KEYS, explainDetails, parseJsonReply, normalizeExplain } from '../js/logic/claude-format.js';
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -34,7 +34,7 @@ export default async function handler(req, res, deps = {}) {
   if (!body) return;
   if (!validate(body)) return send(res, 400, { error: 'bad_request' });
   try {
-    const text = await callClaude({ system: SYSTEM, content: buildContent(body), maxTokens: 700, fetchImpl: deps.fetch });
+    const text = await callClaude({ system: explainSystem(body.level), content: buildContent(body), maxTokens: 700, fetchImpl: deps.fetch });
     return send(res, 200, normalize(parseJsonReply(text), text));
   } catch (e) {
     console.error('explain failed', e.message);

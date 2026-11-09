@@ -48,22 +48,27 @@ function stripLocal(record) {
  * all: { settings: [record], attempts: [...], ... } straight from IndexedDB, tombstones included.
  * Returns [{ store, key, updatedAt, value }].
  */
-export function outgoingChanges(all, since = '') {
+export function outgoingChanges(all, since = '', { everything = false, stamp = '' } = {}) {
+  // everything: upload all records, including ones that came from another device (used when a
+  // device starts a brand-new sync space and must fill it).
   const out = [];
   for (const store of SYNC_STORES) {
     const kp = KEY_PATHS[store];
     for (const r of all[store] || []) {
-      if (!r || !r._localAt || r._localAt <= since) continue;
+      if (!r) continue;
+      if (!everything && (!r._localAt || r._localAt <= since)) continue;
       const key = r[kp];
       if (key === undefined || key === null || key === '') continue;
-      out.push({ store, key: String(key), updatedAt: String(r.updatedAt || r._localAt), value: stripLocal(r) });
+      out.push({ store, key: String(key), updatedAt: String(r.updatedAt || r._localAt || stamp), value: stripLocal(r) });
     }
   }
   const settings = (all.settings || []).find((s) => s && s.id === 'settings');
   if (settings) {
     const times = settings._fieldTimes || {};
-    for (const [field, t] of Object.entries(times)) {
-      if (!isSyncedSetting(field) || !t || t <= since) continue;
+    const fields = everything ? Object.keys(settings).filter(isSyncedSetting) : Object.keys(times);
+    for (const field of fields) {
+      const t = times[field] || (everything ? stamp : '');
+      if (!isSyncedSetting(field) || !t || (!everything && t <= since)) continue;
       out.push({ store: 'settings', key: field, updatedAt: t, value: { key: field, value: settings[field] === undefined ? null : settings[field], updatedAt: t } });
     }
   }
@@ -122,4 +127,33 @@ export function validChange(c) {
   if (!c.value || typeof c.value !== 'object' || Array.isArray(c.value)) return false;
   if (c.store === 'settings' && !isSyncedSetting(c.key)) return false;
   return true;
+}
+
+// ---------------------------------------------------------------- sync codes
+// Each person (or each set of devices) syncs into its own space, picked by a private sync code.
+// 16 characters from Crockford's base32 (no I, L, O, U) is 80 random bits: not guessable.
+
+const CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+/** A new random sync code. `bytes` is 16 random bytes (crypto.getRandomValues in the browser). */
+export function generateSyncCode(bytes) {
+  let out = '';
+  for (let i = 0; i < 16; i++) out += CODE_ALPHABET[bytes[i] % 32];
+  return out;
+}
+
+/** Uppercase, drop spaces and dashes, read look-alikes (O as 0, I and L as 1). Null if not a valid code. */
+export function normalizeSyncCode(raw) {
+  const s = String(raw || '')
+    .toUpperCase()
+    .replace(/[\s-]/g, '')
+    .replace(/O/g, '0')
+    .replace(/[IL]/g, '1');
+  return /^[0-9A-HJKMNP-TV-Z]{16}$/.test(s) ? s : null;
+}
+
+/** "K7QM2XRA9HTDW4PB" -> "K7QM-2XRA-9HTD-W4PB" */
+export function formatSyncCode(code) {
+  const c = normalizeSyncCode(code);
+  return c ? c.match(/.{4}/g).join('-') : '';
 }

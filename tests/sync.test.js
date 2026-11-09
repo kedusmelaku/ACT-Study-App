@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
-import { outgoingChanges, incomingWrites, tombstone, isNewer, validChange } from '../js/logic/sync.js';
+import { outgoingChanges, incomingWrites, tombstone, isNewer, validChange, generateSyncCode, normalizeSyncCode, formatSyncCode } from '../js/logic/sync.js';
 import syncHandler from '../api/sync.js';
 import { redisAvailable, startRedis } from './redis-helper.js';
 
-process.env.APP_PASSCODE = 'pw';
+const CODE = 'K7QM2XRA9HTDW4PB';
+const OTHER = 'ZZZZ0000ZZZZ0000';
 
 const T1 = '2026-11-10T10:00:00.000Z';
 const T2 = '2026-11-10T11:00:00.000Z';
@@ -57,11 +58,11 @@ test('server rejects malformed or device-only changes', () => {
   assert.equal(validChange({ store: 'settings', key: 'passcode', updatedAt: T1, value: {} }), false);
 });
 
-function req(body, passcode = 'pw') {
+function req(body, code = CODE) {
   const raw = JSON.stringify(body);
   const r = Readable.from([Buffer.from(raw)]);
   r.method = 'POST';
-  r.headers = { 'content-type': 'application/json', 'content-length': String(Buffer.byteLength(raw)), 'x-app-passcode': passcode };
+  r.headers = { 'content-type': 'application/json', 'content-length': String(Buffer.byteLength(raw)), ...(code ? { 'x-sync-code': code } : {}) };
   return r;
 }
 function res() {
@@ -71,15 +72,17 @@ function res() {
   r.json = () => JSON.parse(r.body);
   return r;
 }
-async function call(redis, body, passcode) {
+async function call(redis, body, code) {
   const r = res();
-  await syncHandler(req(body, passcode), r, { redis });
+  await syncHandler(req(body, code), r, { redis });
   return r;
 }
 
-test('sync rejects a wrong passcode and reports missing storage', async () => {
-  const r = await call({ cmd: () => assert.fail(), pipeline: () => assert.fail() }, { changes: [] }, 'nope');
-  assert.equal(r.statusCode, 401);
+test('sync rejects a missing or malformed code and reports missing storage', async () => {
+  for (const bad of ['nope', '', 'K7QM-2XRA-9HTD-W4P']) {
+    const r = await call({ cmd: () => assert.fail(), pipeline: () => assert.fail() }, { changes: [] }, bad);
+    assert.equal(r.statusCode, 401);
+  }
   delete process.env.UPSTASH_REDIS_REST_URL;
   delete process.env.KV_REST_API_URL;
   const r2 = res();
@@ -155,4 +158,39 @@ test('first sync: settings already on the server win over a fresh device', () =>
   const recs = [{ store: 'settings', key: 'availability', updatedAt: T1, value: { key: 'availability', value: { 1: 45 } } }];
   assert.deepEqual(incomingWrites(all, recs).settingsPatch, {});
   assert.deepEqual(incomingWrites(all, recs, { forceSettings: new Set(['availability']) }).settingsPatch, { availability: { 1: 45 } });
+});
+
+test('sync codes: generated, normalized from messy typing, formatted', () => {
+  const code = generateSyncCode(Array.from({ length: 16 }, (_, i) => i * 7));
+  assert.equal(normalizeSyncCode(code), code);
+  assert.equal(normalizeSyncCode(' k7qm-2xra 9htd-w4pb '), 'K7QM2XRA9HTDW4PB');
+  assert.equal(normalizeSyncCode('K7QM-2XRA-9HTD-W4PO'), 'K7QM2XRA9HTDW4P0', 'O is read as zero');
+  assert.equal(normalizeSyncCode('K7QM-2XRA-9HTD-W4PU'), null, 'U is never used');
+  assert.equal(formatSyncCode('K7QM2XRA9HTDW4PB'), 'K7QM-2XRA-9HTD-W4PB');
+});
+
+test('a device starting a new space uploads everything, including records that came from sync', () => {
+  const all = {
+    settings: [{ id: 'settings', availability: { 1: 30 }, testDates: [], passcode: 'x', _fieldTimes: {} }],
+    misses: [{ id: 'a', updatedAt: T1, _localAt: '' }, { id: 'b', updatedAt: T2, _localAt: T2 }],
+  };
+  const out = outgoingChanges(all, '', { everything: true, stamp: T3 });
+  assert.deepEqual(out.filter((c) => c.store === 'misses').map((c) => c.key), ['a', 'b']);
+  const fields = out.filter((c) => c.store === 'settings').map((c) => c.key);
+  assert.ok(fields.includes('availability') && fields.includes('testDates'));
+  assert.ok(!fields.includes('passcode'));
+});
+
+test('different sync codes get separate spaces', { skip: noRedis }, async () => {
+  const srv = await startRedis();
+  try {
+    await call(srv.redis, { changes: [{ store: 'misses', key: 'mine', updatedAt: T1, value: { id: 'mine' } }] }, CODE);
+    await call(srv.redis, { changes: [{ store: 'misses', key: 'theirs', updatedAt: T1, value: { id: 'theirs' } }] }, OTHER);
+    const a = await call(srv.redis, { since: 0, changes: [] }, CODE);
+    const b = await call(srv.redis, { since: 0, changes: [] }, 'zzzz-0000-zzzz-0000');
+    assert.deepEqual(a.json().records.map((r) => r.key), ['mine']);
+    assert.deepEqual(b.json().records.map((r) => r.key), ['theirs']);
+  } finally {
+    srv.stop();
+  }
 });

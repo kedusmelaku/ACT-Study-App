@@ -1,6 +1,6 @@
 # ACT Prep
 
-A personal ACT study app. Every practice-test miss becomes data in an error log; a focus engine turns that data into the next thing to study; a deterministic planner fits it into the week around homework; missed questions come back on a spaced schedule; and Claude explains misses and writes a short weekly coaching note.
+An ACT study app. Every practice-test miss becomes data in an error log; a focus engine turns that data into the next thing to study; a deterministic planner fits it into the week around homework; missed questions come back on a spaced schedule; and Claude explains misses and writes a short weekly coaching note.
 
 It is not a question bank. Official ACT materials are the practice source. The app points to them and tracks which sections you've used, and never stores official question text.
 
@@ -18,20 +18,26 @@ It is not a question bank. Official ACT materials are the practice source. The a
 
 The weekly coach on Progress works the same way. Its prompt holds only your numbers, never questions or notes. Switch modes in Settings, under Claude.
 
+## Sharing the app with other people
+
+Anyone can use the same deployment. Each person's data lives on their own device, and onboarding asks for their own test date and scores. Sync spaces are separated by personal sync codes, so nobody's data mixes. Explain and Coach run in each person's own Claude chat by default. Don't share `APP_PASSCODE`: it unlocks built-in Claude mode on your API key.
+
 ## Sync across devices
 
-Each device keeps its own copy and works offline. When online, it pushes what it changed and pulls what other devices changed. If the same item was edited on two devices, the later edit wins. Deletes sync too.
+Each device keeps its own copy and works offline. When online, it pushes what it changed and pulls what your other devices changed. If the same item was edited on two devices, the later edit wins. Deletes sync too.
 
-### One-time setup
+### One-time setup (whoever deploys the app)
 
-1. **Create the database.** In your Vercel project, open the **Storage** tab, pick **Upstash for Redis** from the marketplace, choose the free plan, and connect it to this project. Vercel adds `KV_REST_API_URL` and `KV_REST_API_TOKEN` for you.
-   (Or create a free Redis database at upstash.com and add its `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` to Vercel yourself. Either pair works.)
-2. **Set a passcode.** In Vercel, **Settings, Environment Variables**, add `APP_PASSCODE` with a long random value. This one passcode protects sync and the optional built-in Claude mode.
-3. **Redeploy** so the functions see the new variables (Deployments, the latest one, Redeploy).
-4. **First device (the one with your data):** Settings, Sync across devices, enter the passcode, **Turn on sync**. Everything already on the device uploads.
-5. **Other devices:** open the app. On the first setup screen, tap **I already use ACT Prep on another device** and enter the passcode. If you already set that device up, use Settings, Sync instead.
+1. **Create the database.** In your Vercel project, open the **Storage** tab, pick **Upstash for Redis** from the marketplace, choose the free plan, and connect it to this project. Vercel adds `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
+   (Or create a free Redis database at upstash.com and add its `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` to Vercel yourself.)
+2. **Redeploy** so the functions see the new variables.
 
-Settings, Sync shows when it last synced and any problem in plain words. A few things stay on each device: the passcode, the Claude mode, and the last-backup date.
+### Turning it on (each person)
+
+1. On the device that has your data: **Settings, Sync across devices, Start syncing.** You get a sync code like `K7QM-2XRA-9HTD-W4PB`, and everything on that device uploads.
+2. On your other devices: on the first setup screen tap **I already use ACT Prep on another device**, or use **Settings, Sync, Join with a code**, and enter the code.
+
+Keep the code private: anyone with it can see your data. A few things stay on each device: the Claude mode and passcode, the theme, and the last-backup date.
 
 ## Run it locally
 
@@ -46,7 +52,7 @@ That serves the static app and the `/api` routes at http://localhost:3000. The f
 No Vercel account handy? This runs the same thing with plain Node:
 
 ```bash
-APP_PASSCODE=pick-a-passcode UPSTASH_REDIS_REST_URL=... UPSTASH_REDIS_REST_TOKEN=... node scripts/dev-server.js 3000
+UPSTASH_REDIS_REST_URL=... UPSTASH_REDIS_REST_TOKEN=... node scripts/dev-server.js 3000
 ```
 
 Tests and checks:
@@ -75,8 +81,8 @@ Set these in Vercel. Never commit them.
 
 | Name | What it is |
 |---|---|
-| `APP_PASSCODE` | Needed for sync and for built-in Claude. Any long random value; enter the same one on each device. |
-| `KV_REST_API_URL`, `KV_REST_API_TOKEN` | Sync database. Added automatically when you connect Upstash Redis in Vercel's Storage tab. `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` also work. |
+| `APP_PASSCODE` | Built-in Claude mode only. Any long random value. Keep it to yourself: it uses your API key. |
+| `KV_REST_API_URL`, `KV_REST_API_TOKEN` | Sync database. Added automatically when you connect Upstash Redis in Vercel's Storage tab. `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` also work. Sync itself needs no passcode; each person uses their own sync code. |
 | `ANTHROPIC_API_KEY` | Built-in Claude mode only. Your Anthropic API key, from the Anthropic Console. |
 | `CLAUDE_MODEL` | Built-in Claude mode only, optional. Defaults to `claude-sonnet-5-5`. |
 

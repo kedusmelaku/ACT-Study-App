@@ -3,7 +3,7 @@
 import { generateWeek, heavyNight, rescheduleTask, rescheduleProblem } from '../js/logic/planner.js';
 import { computeFocus } from '../js/logic/focus.js';
 import { createRedo, answerRedo } from '../js/logic/redo.js';
-import { defaultSettings } from '../js/data/calendar.js';
+import { defaultSettings, december2026Preset } from '../js/data/calendar.js';
 import { buildMaterials } from '../js/data/materials.js';
 import { addDays, weekDates, compareDates } from '../js/logic/dates.js';
 import { weekStartFor, isNoStudyDay, dayCapacity } from '../js/logic/phase.js';
@@ -21,7 +21,7 @@ const counts = { heavy: 0, resched: 0, fullDone: 0, tasks: 0, sets: 0, drills: 0
 const fail = (day, msg, extra) => problems.push(`${day}: ${msg}${extra ? ' ' + JSON.stringify(extra).slice(0, 300) : ''}`);
 
 function runSeason(variant) {
-  const settings = { ...defaultSettings(), onboarded: true };
+  const settings = { ...defaultSettings(), ...december2026Preset(), onboarded: true };
   if (variant.legacy) settings.legacyTests = { 'legacy-1': { name: 'L1' }, 'legacy-2': { name: 'L2' }, 'legacy-3': { name: 'L3' } };
   if (variant.guide) settings.prepGuide = { owned: true, tests: 2 };
   if (variant.zeroWeek) settings.availability = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };

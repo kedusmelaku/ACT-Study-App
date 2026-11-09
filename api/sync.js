@@ -1,14 +1,21 @@
 // POST /api/sync: push this device's changes, then pull everything changed since `since`.
+// Each sync code gets its own space: P = actprep:s:<hash of the code>:. The code itself is never stored.
 // Storage (Redis), with prefix P:
 //   P:data:<store>  hash  key -> record JSON
 //   P:ts:<store>    hash  key -> updatedAt (newest edit wins)
 //   P:log           sorted set of "<store>\n<key>", scored by the change sequence number
 //   P:seq           counter
-import { guard, send } from './_auth.js';
+import { createHash } from 'node:crypto';
+import { readJson, send } from './_auth.js';
 import { redisFromEnv } from './_redis.js';
-import { validChange } from '../js/logic/sync.js';
+import { validChange, normalizeSyncCode } from '../js/logic/sync.js';
 
 export const PREFIX = 'actprep:';
+
+/** The Redis key prefix for one sync code's space. */
+export function spaceFor(code) {
+  return `actprep:s:${createHash('sha256').update(code).digest('hex').slice(0, 32)}:`;
+}
 export const PULL_LIMIT = 500;
 export const MAX_PUSH = 400;
 
@@ -87,16 +94,27 @@ export async function pull(redis, since, prefix = PREFIX) {
 }
 
 export default async function handler(req, res, deps = {}) {
-  const body = await guard(req, res);
-  if (!body) return;
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    return send(res, 405, { error: 'method_not_allowed' });
+  }
+  const code = normalizeSyncCode(req.headers && req.headers['x-sync-code']);
+  if (!code) return send(res, 401, { error: 'bad_code' });
+  let body;
+  try {
+    body = await readJson(req);
+  } catch (e) {
+    return send(res, e.status || 400, { error: e.status === 413 ? 'too_large' : 'bad_request' });
+  }
   const redis = deps.redis || redisFromEnv();
   if (!redis) return send(res, 503, { error: 'not_configured' });
   const changes = Array.isArray(body.changes) ? body.changes : [];
   const since = Number.isFinite(Number(body.since)) && Number(body.since) >= 0 ? Math.floor(Number(body.since)) : 0;
   if (changes.length > MAX_PUSH || !changes.every(validChange)) return send(res, 400, { error: 'bad_request' });
+  const prefix = spaceFor(code);
   try {
-    const accepted = await push(redis, changes);
-    const out = body.pull === false ? { records: [], seq: since, more: false } : await pull(redis, since);
+    const accepted = await push(redis, changes, prefix);
+    const out = body.pull === false ? { records: [], seq: since, more: false } : await pull(redis, since, prefix);
     return send(res, 200, { accepted, ...out });
   } catch (e) {
     console.error('sync failed', e.message);

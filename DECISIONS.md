@@ -141,3 +141,12 @@ Judgment calls made without asking. One line each: what, then why.
 - Today shows a "Weekly coach" reminder each plan week until that week's note is saved; the × dismisses it for the week (synced), and dismissed reminders appear in History under Reminders with "Get the note" and "Show on Today".
 - Habits are found from the data, not by Claude: skipping 30% or more of the last two weeks' tasks, 4+ tasks never checked off, one weekday skipped or moved 3 of the last 4 weeks (with a one-tap "Set that day to 15 min or off"), 3+ heavy nights in two weeks, upcoming study days with more work than time, 10+ redos due, 3+ untagged misses, and drills done with no misses logged in 10 days.
 - Habits show on Progress, the reminder mentions the top one, and the coach prompt includes them and asks Claude to address the most important.
+
+## Multi-user
+- Anyone can use one deployment. Data already lived per device; sync now uses a private 16-character sync code per person (Crockford base32, about 80 random bits) instead of the shared APP_PASSCODE, and each code maps to its own Redis space keyed by a hash of the code.
+- Starting sync makes a code on the device and uploads everything there, including records that originally came from another device, so a new space starts complete. Joining takes the code, forgiving spaces, dashes, lowercase, and O/I/L look-alikes.
+- APP_PASSCODE now only guards built-in Claude mode, which spends the deployer's API credits.
+- Devices that had passcode-based sync see a note to start sync again; the old shared space is no longer read.
+- Onboarding asks for each person's own test date (or "I don't have a date yet") and optional recent scores with their kind and scale; nothing is prefilled.
+- New installs start with no dates; full-test days come from the chosen test date (first Saturday, and the Saturday two weeks before the taper). Adding a test date later with no full tests coming up adds them the same way. The original December 2026 calendar is kept as a preset for tests.
+- Claude prompts describe the student by their own estimated composite instead of a fixed "34+ junior with AP classes", and use "they".

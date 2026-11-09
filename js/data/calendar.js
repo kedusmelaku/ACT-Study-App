@@ -64,13 +64,14 @@ export function defaultSettings() {
   return {
     id: 'settings',
     onboarded: false,
-    testDates: DEFAULT_TEST_DATES.map((t) => ({ ...t })),
+    // Dates come from onboarding (each person's own test date); full-test days are worked out from it.
+    testDates: [],
     availability: { ...DEFAULT_AVAILABILITY },
-    fullTests: DEFAULT_FULL_TESTS.map((t) => ({ ...t })),
-    highAvailability: { ...DEFAULT_HIGH_AVAILABILITY },
+    fullTests: [],
+    highAvailability: {},
     busyDates: {},
     heavyNights: [],
-    weekLabels: { ...DEFAULT_WEEK_LABELS },
+    weekLabels: {},
     timezone: (() => {
       try {
         return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
@@ -87,5 +88,15 @@ export function defaultSettings() {
     customMaterials: [],
     customTopics: {},
     checklist: {},
+  };
+}
+
+/** The original December 2026 calendar from the spec, used by tests and the season simulation. */
+export function december2026Preset() {
+  return {
+    testDates: DEFAULT_TEST_DATES.map((t) => ({ ...t })),
+    fullTests: DEFAULT_FULL_TESTS.map((t) => ({ ...t })),
+    highAvailability: { ...DEFAULT_HIGH_AVAILABILITY },
+    weekLabels: { ...DEFAULT_WEEK_LABELS },
   };
 }

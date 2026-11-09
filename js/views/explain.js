@@ -41,7 +41,7 @@ function initForm(query) {
     correctAnswer: m ? m.correctAnswer : '',
     myReasoning: '',
     image: null, // { mediaType, data, preview }, API mode only
-    photoInChat: false, // chat mode: he'll attach the photo in Claude himself
+    photoInChat: false, // chat mode: the photo gets attached in the Claude chat itself
   };
 }
 
@@ -189,7 +189,7 @@ export function render(el, ctx) {
           correctAnswer: form.correctAnswer.trim(),
           myReasoning: form.myReasoning.trim(),
         },
-        { photo: form.photoInChat },
+        { photo: form.photoInChat, level: store.focus().composite },
       );
       const ok = await copyText(prompt);
       chat = { prompt, reply: '' };
@@ -249,6 +249,7 @@ async function requestExplain() {
     correctAnswer: form.correctAnswer.trim() || undefined,
     myReasoning: form.myReasoning.trim() || undefined,
     image: form.image ? { mediaType: form.image.mediaType, data: form.image.data } : undefined,
+    level: store.focus().composite || undefined,
   };
   return postClaude('/api/explain', body);
 }

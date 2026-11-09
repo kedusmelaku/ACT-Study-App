@@ -3,7 +3,7 @@
 // and every few minutes while open. Everything still works offline; changes wait for the next sync.
 import * as store from './store.js';
 import * as db from './db.js';
-import { outgoingChanges } from './logic/sync.js';
+import { outgoingChanges, generateSyncCode, normalizeSyncCode } from './logic/sync.js';
 
 const PUSH_BATCH = 300;
 const PUSH_MAX_BYTES = 1_500_000;
@@ -20,11 +20,17 @@ export function syncState() {
 
 export function isEnabled() {
   const s = store.state.settings;
-  return !!(s.sync && s.sync.enabled && s.passcode);
+  return !!(s.sync && s.sync.enabled && s.sync.code);
+}
+
+/** Sync was on before personal sync codes existed: it needs to be started again once. */
+export function needsUpgrade() {
+  const s = store.state.settings;
+  return !!(s.sync && s.sync.enabled && !s.sync.code);
 }
 
 const MESSAGES = {
-  401: "Passcode didn't match. Check it in Settings.",
+  401: "That sync code isn't valid. Check it in Settings.",
   503: "Sync isn't set up on the server yet. Add the Upstash database in Vercel.",
   offline: "You're offline. Changes will sync when you're back online.",
   network: "Couldn't reach the sync server. Changes will sync next time.",
@@ -35,7 +41,7 @@ async function post(body) {
   try {
     res = await fetch('/api/sync', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-app-passcode': store.state.settings.passcode || '' },
+      headers: { 'content-type': 'application/json', 'x-sync-code': syncState().code || '' },
       body: JSON.stringify(body),
     });
   } catch (e) {
@@ -93,7 +99,10 @@ async function run() {
     }
     // Push everything this device wrote since the last successful push.
     const raw = await db.loadAll();
-    const changes = outgoingChanges(raw, state.lastPushAt || '').filter((c) => !(serverSettings && c.store === 'settings' && serverSettings.has(c.key)));
+    // A device that just started a new sync space uploads everything it has, not only its own recent edits.
+    const changes = outgoingChanges(raw, state.lastPushAt || '', { everything: !!state.fillSpace, stamp: startedAt }).filter(
+      (c) => !(serverSettings && c.store === 'settings' && serverSettings.has(c.key)),
+    );
     let pushed = 0;
     for (const chunk of batches(changes)) {
       const r = await post({ changes: chunk, pull: false });
@@ -149,13 +158,33 @@ export function startSync() {
   if (isEnabled()) syncNow().catch(() => {});
 }
 
+function randomCode() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return generateSyncCode(bytes);
+}
+
 /**
- * Turn sync on with a passcode and run a first sync. Returns a plain-language error or null.
- * Used by Settings and by onboarding on a second device.
+ * Start a new sync space from this device: makes a sync code and uploads everything here.
+ * Returns { code, problem } where problem is a plain-language error or null.
  */
-export async function enableSync(passcode) {
-  await store.saveSettings({ passcode: passcode.trim() });
-  await store.saveSyncState({ enabled: true, lastError: null });
+export async function createSyncSpace() {
+  const code = randomCode();
+  await store.saveSyncState({ enabled: true, code, fillSpace: true, lastPushAt: '', lastPullSeq: 0, lastSyncAt: null, lastError: null });
+  try {
+    await syncNow();
+    await store.saveSyncState({ fillSpace: false });
+    return { code, problem: null };
+  } catch (e) {
+    return { code, problem: MESSAGES[e.code] || MESSAGES.network };
+  }
+}
+
+/** Join an existing sync space with its code. Returns a plain-language error or null. */
+export async function joinSync(raw) {
+  const code = normalizeSyncCode(raw);
+  if (!code) return "That doesn't look like a sync code. It has 16 letters and numbers.";
+  await store.saveSyncState({ enabled: true, code, fillSpace: false, lastPushAt: '', lastPullSeq: 0, lastSyncAt: null, lastError: null });
   try {
     await syncNow();
     return null;

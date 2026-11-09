@@ -7,24 +7,39 @@ export const CAUSE_KEYS = ['content', 'careless', 'time', 'trap'];
 const EXPLAIN_SHAPE =
   '{"explanation": string (at most 120 words), "rule": string (one sentence), "trap": string or null, "fixLine": string (one line, at most 20 words), "suggestedTopic": string (a short ACT topic name), "suggestedCause": one of "content", "careless", "time", "trap"}';
 
-const EXPLAIN_INSTRUCTIONS = `You are a concise ACT tutor for a student who already scores 34 or higher. His remaining misses come from careless errors, traps, and a few niche topics.
-For the question he describes:
-1. Identify the exact rule or skill being tested.
-2. Explain why the correct answer is right and why his answer was tempting.
-3. Name the trap if there was one.
-4. Give a one-line fix he can reuse on future questions.
-No padding, no praise, no restating the question. Do not use em dashes.`;
+/** Who the student is, from their own estimated composite (no fixed level baked in). */
+export function studentLine(level) {
+  const n = Number(level);
+  if (Number.isInteger(n) && n >= 1 && n <= 36) {
+    if (n >= 33) return `a student whose estimated ACT composite is ${n}. Their remaining misses are mostly careless errors, traps, and a few niche topics`;
+    return `a student whose estimated ACT composite is ${n}`;
+  }
+  return 'an ACT student';
+}
 
-export const EXPLAIN_SYSTEM = `${EXPLAIN_INSTRUCTIONS}
+function explainInstructions(level) {
+  return `You are a concise ACT tutor for ${studentLine(level)}.
+For the question they describe:
+1. Identify the exact rule or skill being tested.
+2. Explain why the correct answer is right and why their answer was tempting.
+3. Name the trap if there was one.
+4. Give a one-line fix they can reuse on future questions.
+Pitch the explanation at their level. No padding, no praise, no restating the question. Do not use em dashes.`;
+}
+
+export function explainSystem(level) {
+  return `${explainInstructions(level)}
 Respond with JSON only, no code fences, in exactly this shape:
 ${EXPLAIN_SHAPE}`;
+}
+export const EXPLAIN_SYSTEM = explainSystem(null);
 
 const COACH_SHAPE =
   '{"note": string, "suggestion": null or {"text": string, "setting": null or {"type": "availability", "day": integer 0-6 where 0 is Sunday, "minutes": integer 0-240}}}';
 
-const COACH_INSTRUCTIONS = `You are a calm, direct ACT coach for a high school junior who scores around 34 and is balancing a heavy AP course load. You get an aggregated stats summary for his week.
+const COACH_INSTRUCTIONS = `You are a calm, direct ACT coach for a high school student fitting test prep around a busy school schedule. You get an aggregated stats summary for their week; estimatedComposite is their current level.
 Write a coaching note of at most 5 sentences: what the numbers say, what to keep doing, what to watch. Be specific to the numbers. No padding, no em dashes.
-You may add at most one concrete suggestion, phrased as an option he can take or leave. The app's planner stays in charge; your note is advisory.
+You may add at most one concrete suggestion, phrased as an option they can take or leave. The app's planner stays in charge; your note is advisory.
 If habitsToWatch lists anything, name the most important one plainly and say how to fix it.
 If the suggestion is to change study time on a weekday, include a setting so the app can offer an Apply button.`;
 
@@ -41,20 +56,20 @@ export function explainDetails(body, { photo = !!body.image } = {}) {
   const section = SECTION_KEYS.includes(body.section) ? body.section : null;
   return [
     `Section: ${section || 'unknown'}`,
-    body.topic ? `Topic he tagged: ${clip(body.topic, 80)}` : null,
-    body.description ? `Question (his description): ${clip(body.description, 3000)}` : null,
-    body.myAnswer ? `His answer: ${clip(body.myAnswer, 200)}` : null,
+    body.topic ? `Topic they tagged: ${clip(body.topic, 80)}` : null,
+    body.description ? `Question (their description): ${clip(body.description, 3000)}` : null,
+    body.myAnswer ? `Their answer: ${clip(body.myAnswer, 200)}` : null,
     body.correctAnswer ? `Correct answer: ${clip(body.correctAnswer, 200)}` : null,
-    body.myReasoning ? `His reasoning: ${clip(body.myReasoning, 1500)}` : null,
-    photo ? 'A photo of the question from his own practice test is attached.' : null,
+    body.myReasoning ? `Their reasoning: ${clip(body.myReasoning, 1500)}` : null,
+    photo ? 'A photo of the question from their own practice test is attached.' : null,
   ]
     .filter(Boolean)
     .join('\n');
 }
 
 /** One message to paste into a Claude chat (claude.ai), asking for the same JSON the app parses. */
-export function explainChatPrompt(body, { photo = false } = {}) {
-  return `${EXPLAIN_INSTRUCTIONS}
+export function explainChatPrompt(body, { photo = false, level = null } = {}) {
+  return `${explainInstructions(level)}
 
 ${explainDetails(body, { photo })}
 
