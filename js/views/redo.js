@@ -1,5 +1,6 @@
 // Redo: bring missed questions back on a spaced schedule until they stick.
 import { html, setHTML, safeUrl } from '../safe-html.js';
+import { lessonLinks } from './learn.js';
 import { topicLabel } from '../data/topics.js';
 import * as store from '../store.js';
 import { icon, topbar, sectionBadge, secClass, plural, reportError, toast } from '../ui.js';
@@ -59,6 +60,7 @@ export function render(el) {
             </div>
             ${m.fixLine ? html`<div class="fix-line"><b>Fix</b>${m.fixLine}</div>` : html`<div class="fix-line muted">No fix line saved. <a href="#/log/${m.id}">Add one</a>.</div>`}
             ${m.note && m.questionNumber ? html`<p class="small muted">${m.note}</p>` : ''}
+            ${lessonLinks(m)}
           </div>
           <div class="fab-row">
             <button class="btn btn-danger" data-answer="wrong" data-id="${m.id}">${icon('x')}Wrong</button>

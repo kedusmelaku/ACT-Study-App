@@ -14,6 +14,7 @@ import { topicsOf, toggleTopic, MAX_TOPICS } from '../data/topics.js';
 import { addTestSheet } from './add-test.js';
 import { importResultsSheet } from './import-results.js';
 import { bookletPanel, mountBooklet } from './booklet-view.js';
+import { lessonLinks } from './learn.js';
 import { onChange as onBookletChange, hasBooklet, choicesFor, matchChoice } from '../booklets.js';
 import { parseResults, splitSections, checkResults } from '../logic/results-import.js';
 
@@ -245,6 +246,12 @@ export function render(el, ctx) {
   };
 
   el.addEventListener('click', async (e) => {
+    // Opening a lesson leaves the logger; keep anything typed on the card.
+    if (e.target.closest('.lesson-links a') && draft && stepId() === 'tag') {
+      readTagText(el);
+      saveDraft();
+      return;
+    }
     const rv = e.target.closest('[data-reveal-answer]');
     if (rv) {
       const id = `${draft.sourceId}:${rv.dataset.revealAnswer}`;
@@ -874,6 +881,7 @@ function stepTag() {
     ${hint && hint.text ? html`<div class="q-hint"><p class="q-hint-text">${hint.text}</p></div>` : ''}
     ${reviewBox(key, hint, t, k)}
     <div class="field"><span class="label">Topics <span class="hint">up to ${MAX_TOPICS}${k && k.category ? `. Key category: ${CATEGORY_NAMES[k.category] || k.category}` : ''}</span></span>${topicPicker(s, tagTopics(key), store.state.settings.customTopics, likely)}</div>
+    ${lessonLinks({ section: s, topics: tagTopics(key) })}
     <div class="field"><span class="label">${guessed ? 'Why were you unsure?' : 'Why did you miss it?'}</span>${causePicker(t.cause)}</div>
     <details ${t.note || t.myAnswer || (t.correctAnswer && (!k || t.correctAnswer !== k.answer)) ? html`open` : ''}>
       <summary class="strong small">Add a note or answer choices</summary>

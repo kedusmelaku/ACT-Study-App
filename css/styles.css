@@ -187,7 +187,7 @@ svg:not([width]) { width: 20px; height: 20px; flex: none; }
   left: 0; right: 0; bottom: 0;
   z-index: 20;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   height: calc(var(--nav-h) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
   background: color-mix(in srgb, var(--surface) 92%, transparent);
@@ -203,7 +203,7 @@ svg:not([width]) { width: 20px; height: 20px; flex: none; }
 .tab svg { width: 24px; height: 24px; transition: transform 0.2s var(--ease); }
 .tab[aria-current='page'] { color: var(--accent); }
 .tab[aria-current='page'] .tab-icon { background: var(--accent-soft); }
-.tab-icon { width: 56px; height: 30px; border-radius: 999px; display: grid; place-items: center; transition: background 0.2s var(--ease); }
+.tab-icon { width: 48px; height: 30px; border-radius: 999px; display: grid; place-items: center; transition: background 0.2s var(--ease); }
 .tab-badge {
   position: absolute; top: 6px; left: calc(50% + 10px);
   min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
@@ -763,3 +763,19 @@ summary { cursor: pointer; min-height: 32px; display: list-item; }
 
 .out-of { font-size: 0.6em; font-weight: 600; opacity: 0.7; margin-left: 1px; }
 .on36 { display: block; font-size: 0.72rem; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ---------- learn ---------- */
+.lesson h2 { font-size: 1.05rem; }
+.lesson p { margin: 0; line-height: 1.55; }
+.lesson-summary { background: var(--sec-soft); border-color: transparent; }
+.lesson-summary p { font-weight: 600; }
+.lesson-list, .lesson-steps { margin: 0; padding-left: 20px; display: grid; gap: 8px; line-height: 1.5; }
+.lesson-choices { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.lesson-choices li { padding: 8px 12px; border-radius: 10px; background: var(--surface-2); }
+.lesson-choices li.is-answer { background: var(--success-soft); color: var(--success); font-weight: 650; }
+.lesson-prompt { font-size: 1rem; }
+.lesson-prompt u { text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.check-q { display: block; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.qnum-sm { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-weight: 700; background: var(--sec-soft); color: var(--sec); }
+.learn-done { background: var(--success-soft) !important; color: var(--success) !important; }
+.lesson-links { gap: 8px; }

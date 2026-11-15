@@ -1,5 +1,6 @@
 // Reusable view pieces: task cards and their actions.
 import { html } from '../safe-html.js';
+import { lessonHref } from '../data/lessons.js';
 import { safeUrl } from '../safe-html.js';
 import * as store from '../store.js';
 import { icon, sectionBadge, secClass, fmtMinutes, reportError, toast, openSheet, undoToast } from '../ui.js';
@@ -56,7 +57,7 @@ export function taskCard(t, { showActions = true, collapsed = false } = {}) {
       </div>
       <div class="task-more" ${collapsed ? html`hidden` : ''}>
         <p class="task-detail">${t.detail}</p>
-        <div class="row mt">${taskLink(t)}</div>
+        <div class="row mt">${t.lessonRef ? html`<a class="btn btn-sm btn-secondary" href="${lessonHref(t.lessonRef.section, t.lessonRef.topic)}">${icon('book')}Open lesson</a>` : ''}${taskLink(t)}</div>
       </div>
       ${showActions && !collapsed && t.status === 'todo'
         ? html`<div class="task-actions">

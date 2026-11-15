@@ -21,11 +21,14 @@ import * as redo from './views/redo.js';
 import * as progress from './views/progress.js';
 import * as explain from './views/explain.js';
 import * as historyView from './views/history.js';
+import * as learn from './views/learn.js';
 
 const ROUTES = [
   { pattern: /^\/?$/, view: today, tab: 'today' },
   { pattern: /^\/today$/, view: today, tab: 'today' },
   { pattern: /^\/plan$/, view: plan, tab: 'plan' },
+  { pattern: /^\/learn$/, view: learn, tab: 'learn' },
+  { pattern: /^\/learn\/([a-z]+)\/([a-z0-9-]+)$/, view: learn, tab: 'learn', keys: ['section', 'slug'] },
   { pattern: /^\/log$/, view: log, tab: 'log' },
   { pattern: /^\/log\/new$/, view: missForm, tab: 'log' },
   { pattern: /^\/log\/([^/]+)$/, view: missForm, tab: 'log', keys: ['id'] },
@@ -45,6 +48,7 @@ const ROUTES = [
 const TABS = [
   { id: 'today', label: 'Today', href: '#/today', icon: 'today' },
   { id: 'plan', label: 'Plan', href: '#/plan', icon: 'plan' },
+  { id: 'learn', label: 'Learn', href: '#/learn', icon: 'book' },
   { id: 'log', label: 'Log', href: '#/log', icon: 'log' },
   { id: 'tests', label: 'Tests', href: '#/tests', icon: 'tests' },
   { id: 'more', label: 'More', href: '#/more', icon: 'more' },

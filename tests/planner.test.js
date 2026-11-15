@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateWeek, allocateSlots } from '../js/logic/planner.js';
+import { generateWeek, allocateSlots, withLesson, lessonKey, LESSON_REFRESH_DAYS } from '../js/logic/planner.js';
 import { computeFocus } from '../js/logic/focus.js';
 import { weekDates, addDays } from '../js/logic/dates.js';
 import { settings as mkSettings, materials as mkMaterials, attempt, miss } from './helpers.js';
@@ -260,6 +260,34 @@ test('misread misses lead to a read-the-question drill', () => {
   assert.equal(focus.bySection.reading.dominantCause, 'misread');
   const drills = plan({ weekStart: '2026-11-14', today: '2026-11-14', misses }).tasks.filter((t) => t.type === 'drill' && t.section === 'reading');
   assert.ok(drills.length > 0);
-  assert.match(drills[0].title, /read-the-question/);
   assert.match(drills[0].detail, /NOT, EXCEPT/);
+});
+
+test('drills pair with lessons: learn first, warm up later, then just link', () => {
+  const drill = { section: 'english', type: 'drill', topic: 'Commas', title: 'English checking-habit set', detail: 'Do the set.' };
+  const today = '2026-11-20';
+  const fresh = withLesson(drill, {}, today);
+  assert.equal(fresh.lessonStep, 'learn');
+  assert.match(fresh.title, /^Learn \+ drill: Commas/);
+  assert.deepEqual(fresh.lessonRef, { section: 'english', topic: 'Commas' });
+  const review = withLesson(drill, { lessonsStudied: { [lessonKey('english', 'Commas')]: '2026-11-10' } }, today);
+  assert.equal(review.lessonStep, 'review');
+  assert.match(review.detail, /^Warm up/);
+  const recent = withLesson(drill, { lessonsStudied: { [lessonKey('english', 'Commas')]: '2026-11-18' } }, today);
+  assert.equal(recent.lessonStep, undefined);
+  assert.equal(recent.title, drill.title);
+  const stale = withLesson(drill, { lessonsStudied: { [lessonKey('english', 'Commas')]: '2026-10-01' } }, today);
+  assert.equal(stale.lessonStep, 'learn', `studied more than ${LESSON_REFRESH_DAYS} days ago`);
+  // Custom topics have no lesson.
+  assert.equal(withLesson({ ...drill, topic: 'My topic' }, {}, today).lessonRef, undefined);
+});
+
+test('the week plan includes learn steps for unstudied focus topics', () => {
+  const misses = [miss('reading', 'Inference', 'trap', '2026-11-12'), miss('reading', 'Inference', 'content', '2026-11-13')];
+  const week = plan({ weekStart: '2026-11-14', today: '2026-11-14', misses });
+  const learn = week.tasks.filter((t) => t.lessonStep === 'learn');
+  assert.ok(learn.length > 0);
+  assert.ok(learn.every((t) => t.lessonRef && t.title.startsWith('Learn + drill')));
+  const again = plan({ weekStart: '2026-11-14', today: '2026-11-14', misses });
+  assert.deepEqual(week, again, 'still deterministic');
 });

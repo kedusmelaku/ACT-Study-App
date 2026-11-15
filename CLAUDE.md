@@ -267,10 +267,11 @@ Its output is a ranked list of sections with a priority score, plus the ranked t
   - Number of redos due.
   - Backup reminder, if one is due.
 - **Plan:** the week view, with tasks by day.
+- **Learn:** a lesson for every topic in the taxonomy (`js/data/lessons/`): a two-sentence summary, a short explanation, a worked example, self-check questions, 1 to 3 videos, and the misses tagged with that topic. Each miss links to its lessons, and the planner adds a learn step to drills on topics not studied in the last 28 days (`settings.lessonsStudied`).
 - **Log:** the error log.
 - **Tests:** a list of attempts, plus "Add test".
 - **Settings:** dates, slots, materials, export/import, and (in Phase 3) the passcode.
-- Navigation is a bottom tab bar: Today, Plan, Log, Tests, More (the More tab holds Redo, Explain, Progress, and Settings as they're added).
+- Navigation is a bottom tab bar: Today, Plan, Learn, Log, Tests, More (the More tab holds Redo, Explain, Progress, and Settings as they're added).
 
 **Phase 1 done when:** he can enter a test with tagged misses, see the composite and focus, get a generated week plan, check off tasks, and export his data. Install works on Android. All JS passes `node --check`. The scoring, focus, and planner tests pass.
 

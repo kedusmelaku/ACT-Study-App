@@ -125,6 +125,7 @@ js/safe-html.js      html`` template that escapes by default, setHTML
 js/data/*            ACT constants, topics, materials, calendar defaults
 js/logic/*           pure logic: scoring, focus, planner, redo, dates, phase, progress
 js/views/*           one module per screen
+js/data/lessons/*    a lesson per topic for the Learn tab (lesson-videos.js has the video links)
 api/_auth.js         passcode check and body limits
 api/_claude.js       Anthropic Messages API call
 api/_redis.js        Upstash Redis REST client

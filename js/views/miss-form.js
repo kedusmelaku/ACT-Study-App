@@ -1,5 +1,6 @@
 // Quick-add and edit form for a single miss.
 import { html, setHTML } from '../safe-html.js';
+import { lessonLinks } from './learn.js';
 import * as store from '../store.js';
 import { icon, topbar, reportError, undoToast, toast, openSheet } from '../ui.js';
 import { ALL_SECTIONS, SECTIONS, CAUSES, CAUSE_KEYS } from '../data/act.js';
@@ -246,6 +247,7 @@ export function render(el, ctx) {
         actions: existing ? html`<a class="btn btn-sm btn-secondary" href="#/explain?miss=${existing.id}">${icon('explain')}Explain</a>` : '',
       })}
       ${existing && existing.explanation ? html`<details class="card card-soft mt"><summary class="strong">Claude's explanation</summary><p class="small explain-out mt">${existing.explanation}</p></details>` : ''}
+      ${existing ? html`<div class="mt">${lessonLinks(existing)}</div>` : ''}
       <div data-form class="mt"></div>
       ${existing ? html`<button class="btn btn-danger btn-block mt" data-action="delete">${icon('trash')}Delete miss</button>` : ''}`,
   );

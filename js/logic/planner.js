@@ -4,11 +4,16 @@ import { SECTIONS, CORE_SECTIONS, ALL_SECTIONS, LEGACY_SECTIONS, ENHANCED_PARTS,
 import { weekDates, compareDates, daysBetween, formatDate } from './dates.js';
 import { dayPhase, dayCapacity, isNoStudyDay, weekStartFor, fullTestOn } from './phase.js';
 import { dueByDate } from './redo.js';
+import { lessonFor } from '../data/lessons.js';
 
 const MIN_SLOT = 15;
 const BLOCK_MIN = 90;
 const BLOCK_SLOT_TARGET = 40;
 const SET_REVIEW_MINUTES = 10;
+// Lessons: study one before drilling a topic not studied in this many days; between REVIEW and REFRESH
+// days, open the drill with the lesson's check questions from memory (spaced retrieval).
+export const LESSON_REFRESH_DAYS = 28;
+export const LESSON_REVIEW_DAYS = 7;
 const LOG_TEST_MINUTES = 20;
 
 const PRIORITY = {
@@ -383,6 +388,36 @@ function drillTask(section, cause, topic, ledger, minutes) {
   }
 }
 
+/** Key for a lesson in settings.lessonsStudied. */
+export function lessonKey(section, topic) {
+  return `${section}|${topic}`;
+}
+
+/**
+ * Pair a drill with its topic's lesson: learn first when the lesson hasn't been studied lately, warm up
+ * with its check questions from memory when it was studied a while ago, otherwise just link it.
+ */
+export function withLesson(task, settings, today) {
+  const { section, topic } = task;
+  if (!topic || !lessonFor(section, topic)) return task;
+  const studied = (settings.lessonsStudied || {})[lessonKey(section, topic)];
+  const age = studied ? daysBetween(studied, today) : Infinity;
+  const lessonRef = { section, topic };
+  if (!(age <= LESSON_REFRESH_DAYS)) {
+    return {
+      ...task,
+      lessonRef,
+      lessonStep: 'learn',
+      title: `Learn + drill: ${topic}`,
+      detail: `First, about 10 minutes on the ${topic} lesson in Learn: try the worked example before revealing it, then answer the check questions from memory. Then: ${task.detail}`,
+    };
+  }
+  if (age >= LESSON_REVIEW_DAYS) {
+    return { ...task, lessonRef, lessonStep: 'review', detail: `Warm up: answer the ${topic} check questions in Learn from memory (2 minutes). Then: ${task.detail}` };
+  }
+  return { ...task, lessonRef };
+}
+
 function redoTask(count) {
   return {
     section: null,
@@ -651,7 +686,7 @@ export function generateWeek({ weekStart, today, settings, focus, redos = [], ma
     }
     const topics = info.topics.slice(0, 3);
     const topic = topics.length ? topics[topicIndex[s]++ % topics.length].topic : null;
-    const base = drillTask(s, info.dominantCause, topic, ledger, slot.minutes);
+    const base = withLesson(drillTask(s, info.dominantCause, topic, ledger, slot.minutes), settings, today);
     add(slot.date, dayNext[slot.date]++, base, sectionPriority(s));
   });
 

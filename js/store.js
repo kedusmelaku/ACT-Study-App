@@ -561,11 +561,20 @@ export async function setTaskStatus(id, status) {
   }
   await db.batch(ops);
   state.tasks = state.tasks.map((x) => (x.id === id ? next : x));
+  // Finishing a "Learn + drill" task counts as studying its lesson.
+  if (status === 'done' && next.lessonRef && next.lessonStep === 'learn') await markLessonStudied(next.lessonRef.section, next.lessonRef.topic, { regen: false });
   const removeIds = new Set(removeUse.map((u) => u.id));
   state.materialUse = [...state.materialUse.filter((u) => !removeIds.has(u.id) && !addUse.some((a) => a.id === u.id)), ...addUse];
   // Skipping or un-skipping a full test changes what the rest of the week needs (the "log the test" task).
   if (t.type === 'full_test') await regenerateAndEmit(status === 'skipped' ? 'You skipped a full test' : 'You changed a full test');
   else emit();
+}
+
+/** Record that a lesson was studied today (it shapes which drills include a learn step). */
+export async function markLessonStudied(section, topic, { regen = true } = {}) {
+  const key = `${section}|${topic}`;
+  const studied = { ...(state.settings.lessonsStudied || {}), [key]: today() };
+  await saveSettings({ lessonsStudied: studied }, { regen });
 }
 
 /**
