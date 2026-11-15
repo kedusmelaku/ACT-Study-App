@@ -176,3 +176,17 @@ export function keyedScores(form, marks = {}, taken = []) {
   }
   return { scores, detail };
 }
+
+/**
+ * The likely range on the 36-point scale for a score out of 35. A whole score k stands for anything
+ * from k - 0.5 to k + 0.5 on its own scale; stretched to 36 points and rounded, that gives the range.
+ * Approximate: the two scales aren't strictly proportional.
+ */
+export function rangeOn36(score) {
+  const k = Number(score);
+  if (!Number.isFinite(k) || k < MIN_SCORE || k > 35) return null;
+  const f = MAX_SCORE / 35;
+  const low = Math.max(MIN_SCORE, Math.min(MAX_SCORE, roundScore((k - 0.5) * f)));
+  const high = Math.max(MIN_SCORE, Math.min(MAX_SCORE, Math.ceil((k + 0.5) * f - 0.5 - 1e-9)));
+  return { low, high: Math.max(low, high) };
+}

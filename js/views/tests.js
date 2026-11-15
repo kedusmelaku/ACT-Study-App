@@ -3,7 +3,7 @@ import { html, setHTML } from '../safe-html.js';
 import * as store from '../store.js';
 import { icon, topbar, emptyState, plural } from '../ui.js';
 import { ALL_SECTIONS, SECTIONS, ATTEMPT_KINDS } from '../data/act.js';
-import { compositeOf, stemOf, superscore } from '../logic/scoring.js';
+import { compositeOf, stemOf, superscore, rangeOn36 } from '../logic/scoring.js';
 import { formatDate } from '../logic/dates.js';
 
 export const live = true;
@@ -13,10 +13,18 @@ export function outOf(scale) {
   return Number(scale) === 35 ? html`<small class="out-of">/35</small>` : '';
 }
 
+/** "≈34–35 of 36" for a score out of 35: roughly where it lands on the 36-point scale. */
+export function on36(score, scale, { suffix = ' of 36' } = {}) {
+  if (Number(scale) !== 35) return '';
+  const r = rangeOn36(score);
+  if (!r) return '';
+  return `≈${r.low === r.high ? r.low : `${r.low}–${r.high}`}${suffix}`;
+}
+
 export function scoreRow(scores, scale) {
   return html`<div class="score-row">
     ${ALL_SECTIONS.map(
-      (s) => html`<div class="score-cell sec-${s}"><b>${scores && scores[s] ? html`${scores[s]}${outOf(scale)}` : '--'}</b><span>${SECTIONS[s].label}</span></div>`,
+      (s) => html`<div class="score-cell sec-${s}"><b>${scores && scores[s] ? html`${scores[s]}${outOf(scale)}` : '--'}</b><span>${SECTIONS[s].label}</span>${scores && scores[s] && on36(scores[s], scale) ? html`<small class="on36">${on36(scores[s], scale, { suffix: '' })}</small>` : ''}</div>`,
     )}
   </div>`;
 }
@@ -66,7 +74,7 @@ export function render(el) {
                       ${st ? html`<span class="badge">STEM ${st}</span>` : ''}
                     </div>
                   </div>
-                  <div class="center"><div class="score-big" style="font-size:1.7rem">${c ?? '--'}${c ? outOf(a.scale) : ''}</div><div class="tiny muted">${a.kind === 'real' ? 'Real' : a.kind === 'benchmark' ? 'Benchmark' : 'Practice'}</div></div>
+                  <div class="center"><div class="score-big" style="font-size:1.7rem">${c ?? '--'}${c ? outOf(a.scale) : ''}</div><div class="tiny muted">${a.kind === 'real' ? 'Real' : a.kind === 'benchmark' ? 'Benchmark' : 'Practice'}</div>${c && on36(c, a.scale) ? html`<div class="on36">${on36(c, a.scale)}</div>` : ''}</div>
                 </a>`;
               })}
             </div>`

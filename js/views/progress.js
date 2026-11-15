@@ -1,5 +1,6 @@
 // Progress: trend chart, superscore, top topics, why you miss, and the weekly coach.
 import { html, setHTML } from '../safe-html.js';
+import { on36 } from './tests.js';
 import * as store from '../store.js';
 import { icon, topbar, emptyState, plural, toast, notice, copyText, chatPanel } from '../ui.js';
 import { coachChatPrompt, parseJsonReply, normalizeCoach } from '../logic/claude-format.js';
@@ -234,7 +235,7 @@ function bindChart(el, series, width) {
       tip,
       html`<div class="strong small">${formatDate(p.date, { year: true })} <span class="muted">${p.real ? 'Real ACT' : p.kind === 'benchmark' ? 'Benchmark' : 'Practice'}${p.scale === 35 ? ', out of 35' : ''}</span></div>
         <div class="row-wrap tiny">${ALL_SECTIONS.filter((s) => p.scores[s]).map((s) => html`<span><i class="cause-key" style="background:var(--chart-${s})"></i>${SECTIONS[s].short} ${p.scores[s]}</span>`)}</div>
-        <div class="tiny muted">Composite ${p.composite ?? 'n/a'}, estimate ${p.estComposite ?? 'n/a'}</div>`,
+        <div class="tiny muted">Composite ${p.composite ?? 'n/a'}${p.composite && p.scale === 35 ? ` (${on36(p.composite, 35)})` : ''}, estimate ${p.estComposite ?? 'n/a'}</div>`,
     );
     tip.hidden = false;
     const box = svg.getBoundingClientRect();

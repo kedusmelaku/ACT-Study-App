@@ -78,3 +78,17 @@ test('a duplicated benchmark (one per device) counts once', () => {
   assert.equal(e.english.count, 2);
   assert.deepEqual(e.english.attemptIds, ['p', 'b1']);
 });
+
+test('a score out of 35 maps to a range on the 36 scale', async () => {
+  const { rangeOn36 } = await import('../js/logic/scoring.js');
+  assert.deepEqual(rangeOn36(34), { low: 34, high: 35 });
+  assert.deepEqual(rangeOn36(35), { low: 35, high: 36 });
+  assert.deepEqual(rangeOn36(33), { low: 33, high: 34 });
+  assert.deepEqual(rangeOn36(1), { low: 1, high: 2 });
+  assert.equal(rangeOn36(36), null);
+  assert.equal(rangeOn36(0), null);
+  for (let k = 1; k <= 35; k++) {
+    const r = rangeOn36(k);
+    assert.ok(r.low >= k && r.high <= 36 && r.high - r.low <= 1, `k=${k}`);
+  }
+});
