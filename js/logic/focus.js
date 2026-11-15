@@ -1,5 +1,5 @@
 // Focus engine: decides which section and topics matter most right now. Pure functions.
-import { CORE_SECTIONS, CAUSES, CAUSE_KEYS, GUESSED_RIGHT_MULT, FOCUS, TIMING_FLAG, MAX_SCORE, SECTIONS } from '../data/act.js';
+import { CORE_SECTIONS, CAUSES, CAUSE_KEYS, GUESSED_RIGHT_MULT, UNSCORED_MULT, FOCUS, TIMING_FLAG, MAX_SCORE, SECTIONS } from '../data/act.js';
 import { estimates, composite, estimatedComposite } from './scoring.js';
 import { ageInDays, dateOf } from './dates.js';
 import { rightCount } from './redo.js';
@@ -15,8 +15,9 @@ export function missDate(miss) {
 }
 
 export function causeMultiplier(miss) {
-  if (miss.guessedRight) return GUESSED_RIGHT_MULT;
-  return (CAUSES[miss.cause] || CAUSES.content).mult;
+  if (miss.guessedRight) return miss.unscored ? Math.min(GUESSED_RIGHT_MULT, UNSCORED_MULT) : GUESSED_RIGHT_MULT;
+  const m = (CAUSES[miss.cause] || CAUSES.content).mult;
+  return miss.unscored ? Math.min(m, UNSCORED_MULT) : m;
 }
 
 /** One miss's contribution to its topic weight, including redo effects. */

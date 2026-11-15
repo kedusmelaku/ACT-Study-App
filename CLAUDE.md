@@ -45,7 +45,7 @@ The app must still be useful after Dec 12: he has a school-day ACT in April 2027
 - **STEM score** = average of Math and Science, rounded the same way. Show it only when Science is entered.
 - **Superscore** = composite of the best English, best Math, and best Reading across **real** ACT attempts only, never practice tests.
 - Math has 4 answer choices.
-- Some questions in every section are unscored field-test items, and the test-taker can't tell which. No logic should depend on this.
+- Unscored field-test items can't be identified on test day, but official practice-test keys mark them. The app uses those keys when it has them.
 - Legacy (pre-2025) official tests have more questions per section. When the app assigns a legacy section, it gives the question count to do and the time budget at enhanced pace, not the legacy time limit.
 
 Put all of these values in `js/data/act.js` as constants. Nothing else should hardcode them.

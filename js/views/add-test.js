@@ -2,6 +2,7 @@
 import { html, safeUrl } from '../safe-html.js';
 import * as store from '../store.js';
 import { openSheet, reportError } from '../ui.js';
+import { duplicatesBuiltIn } from '../data/materials.js';
 
 const TYPES = [
   { format: 'enhanced', label: 'Full practice test', note: "Today's format" },
@@ -19,7 +20,7 @@ export async function addTestSheet(existing = null) {
     html`<h2>${existing ? 'Edit test' : 'Add a test'}</h2>
       <form class="stack" data-add-test>
         <div class="field"><label for="at-name">Name</label>
-          <input class="input" id="at-name" name="title" maxlength="80" required value="${existing ? existing.title : ''}" placeholder="e.g. Official Practice Test 3"></div>
+          <input class="input" id="at-name" name="title" maxlength="80" required value="${existing ? existing.title : ''}" placeholder="e.g. Official Practice Test 5"></div>
         <div class="field"><span class="label">Type</span>
           <div class="chips">${TYPES.map(
             (t) => html`<button type="button" class="chip chip-lg" data-format="${t.format}" aria-pressed="${st.format === t.format}"><span>${t.label}</span><small>${t.note}</small></button>`,
@@ -46,6 +47,11 @@ export async function addTestSheet(existing = null) {
         const err = form.querySelector('[data-error]');
         if (!title) {
           err.textContent = 'Give it a name.';
+          err.hidden = false;
+          return;
+        }
+        if (!existing && duplicatesBuiltIn({ title })) {
+          err.textContent = "That one's built in. Pick it from the list.";
           err.hidden = false;
           return;
         }

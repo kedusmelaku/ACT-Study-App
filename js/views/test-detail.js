@@ -50,7 +50,7 @@ export function render(el, ctx) {
             ? html`<div class="list">${misses.map(
                 (m) => html`<a class="list-item" href="#/log/${m.id}">
                   <div class="qnum sec-${m.section}" style="width:40px;height:40px;font-size:0.95rem;border-radius:11px">${m.questionNumber || '?'}</div>
-                  <div class="grow"><div class="strong">${m.topic || 'Untagged'}</div><div class="row-wrap" style="margin-top:4px">${sectionBadge(m.section)}${causeBadge(m.cause, m.guessedRight)}</div></div>
+                  <div class="grow"><div class="strong">${m.topic || 'Untagged'}</div><div class="row-wrap" style="margin-top:4px">${sectionBadge(m.section)}${causeBadge(m.cause, m.guessedRight)}${m.unscored ? html`<span class="badge">Not scored</span>` : ''}</div></div>
                   ${icon('chev', 'chev')}</a>`,
               )}</div>`
             : html`<div class="day-empty">No misses logged for this test.</div>`}

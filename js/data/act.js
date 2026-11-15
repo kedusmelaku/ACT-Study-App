@@ -58,6 +58,9 @@ export const CAUSES = Object.freeze({
 export const CAUSE_KEYS = Object.freeze(['content', 'careless', 'time', 'trap']);
 /** Questions answered right only by guessing count at this weight. */
 export const GUESSED_RIGHT_MULT = 0.5;
+// Misses on unscored (field-test) questions, known from official practice-test keys.
+// When a miss is both unscored and guessed right, the smaller multiplier wins, not the product.
+export const UNSCORED_MULT = 0.5;
 
 /** Focus engine tuning. */
 export const FOCUS = Object.freeze({

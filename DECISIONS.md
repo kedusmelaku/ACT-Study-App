@@ -157,3 +157,12 @@ Judgment calls made without asking. One line each: what, then why.
 - Logging a full practice test within 3 days of a planned full-test day counts as that day, even if it was a different test; the planned test stays unused for a later full-test day. Editing which test an attempt was moves this along with it.
 - "Something else" in test entry is now labeled "(not tracked)", since it doesn't record which test it was.
 - Added tests can be renamed or relinked any time, and removed only while no attempt uses them.
+- Official Practice Tests 1 to 4 have built-in scoring keys (js/data/forms.js), read from the four official scoring-key PDFs and spot-checked against rendered key pages. Logging one goes Source, Misses, Tag: scores come from scored questions minus scored misses, through each test's own conversion table.
+- The uploaded keys are treated as the real ones. All four tests are titled "Official Practice Test 1" to "4" and link to the ACT test prep hub; the old PDF links were dropped since they may be different forms.
+- A hand-added "Practice Test 1 to 4" entry is removed on load if no attempt, miss, full-test day, or finished task uses it, since those tests are built in now.
+- Misses on unscored questions still get redos and stay in the log, but count at half weight in the focus engine. When a miss is both unscored and guessed right, the smaller multiplier is used, not the product.
+- Whether a miss is unscored comes from the key whenever its test and question number are known, so edits and quick-add misses stay correct.
+- Each section of a keyed test has an "I took this section" toggle, all on by default (Science too, since full tests include it).
+- "Edit scores" on a keyed test starts from the key's scores and sticks even if misses change later, until "Use key scores". Attempts record scoredBy 'key' or 'manual'; older attempts count as manual, so editing them never changes their scores.
+- The tag card shows the key letter as "Key: C" (A is the first choice listed) instead of filling in the answer fields, since the online review shows answer values, not letters.
+- Each key's reporting category maps to likely app topics, which the tag card lists first. All other topics stay available.

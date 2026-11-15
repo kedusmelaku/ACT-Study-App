@@ -15,12 +15,19 @@ const CAUSE_HELP = {
   trap: 'Picked a plausible but unsupported answer',
 };
 
-export function topicPicker(section, selected, customTopics) {
+/** Topic chips. `likely` topics (from an answer key's category) are listed first, set apart. */
+export function topicPicker(section, selected, customTopics, likely = []) {
   const topics = topicsFor(section, customTopics);
   const all = selected && !topics.includes(selected) ? [...topics, selected] : topics;
-  return html`<div class="chips" role="group" aria-label="Topic">
-    ${all.map((t) => html`<button type="button" class="chip" data-topic="${t}" aria-pressed="${t === selected}">${t}</button>`)}
-    <button type="button" class="chip" data-topic-new>${icon('plus')}New topic</button>
+  const first = all.filter((t) => likely.includes(t));
+  const rest = all.filter((t) => !likely.includes(t));
+  const chip = (t) => html`<button type="button" class="chip" data-topic="${t}" aria-pressed="${t === selected}">${t}</button>`;
+  return html`<div role="group" aria-label="Topic">
+    ${first.length ? html`<div class="chips chips-likely">${first.map(chip)}</div>` : ''}
+    <div class="chips">
+      ${rest.map(chip)}
+      <button type="button" class="chip" data-topic-new>${icon('plus')}New topic</button>
+    </div>
   </div>`;
 }
 

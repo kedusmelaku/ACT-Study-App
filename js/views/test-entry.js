@@ -1,10 +1,12 @@
 // Test entry wizard: source, scores, missed-question grid with pacing, then the tagging queue.
+// Tests with a built-in key (Official Practice Tests 1 to 4) skip the scores step: scores come from the misses.
 import { html, setHTML } from '../safe-html.js';
 import * as store from '../store.js';
 import { icon, topbar, reportError, toast, confirmSheet, plural } from '../ui.js';
 import { ALL_SECTIONS, SECTIONS, ATTEMPT_KINDS, LEGACY_SECTIONS, MIN_SCORE, MAX_SCORE } from '../data/act.js';
 import { attemptSources } from '../data/materials.js';
-import { composite, stem } from '../logic/scoring.js';
+import { composite, stem, keyedScores } from '../logic/scoring.js';
+import { FORMS, isKeyed, keyFor, CATEGORY_NAMES, CATEGORY_TOPICS } from '../data/forms.js';
 import { isTimingFlag } from '../logic/focus.js';
 import { isISODate } from '../logic/dates.js';
 import { topicPicker, causePicker, promptNewTopic } from './miss-form.js';
@@ -13,7 +15,7 @@ import { addTestSheet } from './add-test.js';
 export const live = false;
 
 const DRAFT_KEY = 'act-prep-test-draft';
-const STEPS = ['Source', 'Scores', 'Misses', 'Tag'];
+const STEP_LABELS = { source: 'Source', scores: 'Scores', misses: 'Misses', tag: 'Tag' };
 
 let draft = null;
 
@@ -38,6 +40,8 @@ function blankDraft(query) {
     notes: '',
     scores: { english: '', math: '', reading: '', science: '' },
     marks: { english: {}, math: {}, reading: {}, science: {} },
+    taken: { english: true, math: true, reading: true, science: true },
+    useKey: true,
     pacing: {},
     tags: {},
     activeSection: 'english',
@@ -63,6 +67,9 @@ function draftFromAttempt(a) {
   d.scale = a.scale || 36;
   d.notes = a.notes || '';
   for (const s of ALL_SECTIONS) d.scores[s] = a.scores && a.scores[s] ? String(a.scores[s]) : '';
+  for (const s of ALL_SECTIONS) d.taken[s] = Boolean(a.scores && a.scores[s]);
+  // Only attempts scored from the key follow it. Older ones keep the scores typed in.
+  d.useKey = a.scoredBy === 'key';
   for (const p of store.state.pacing.filter((x) => x.attemptId === a.id)) {
     d.pacing[p.section] = { notReached: p.notReached || 0, guessedAtEnd: p.guessedAtEnd || 0, minutesLeft: p.minutesLeft || 0 };
   }
@@ -114,20 +121,52 @@ function pruneMarks() {
   }
 }
 
-function scoreValue(s) {
+/** True when the chosen test has a built-in key, so scores come from the marked misses. */
+function keyed() {
+  return draft.kind === 'official_enhanced' && isKeyed(draft.sourceId);
+}
+
+function stepIds() {
+  return keyed() ? ['source', 'misses', 'tag'] : ['source', 'scores', 'misses', 'tag'];
+}
+
+function stepId() {
+  const ids = stepIds();
+  return ids[Math.min(draft.step, ids.length - 1)];
+}
+
+function takenSections() {
+  return ALL_SECTIONS.filter((s) => !draft.taken || draft.taken[s] !== false);
+}
+
+function keyResult() {
+  return keyedScores(FORMS[draft.sourceId], draft.marks, takenSections());
+}
+
+function manualValue(s) {
   const v = Number(draft.scores[s]);
-  return Number.isInteger(v) && v >= MIN_SCORE && v <= (draft.scale === 35 ? 35 : MAX_SCORE) ? v : null;
+  const max = draft.scale === 35 && !keyed() ? 35 : MAX_SCORE;
+  return Number.isInteger(v) && v >= MIN_SCORE && v <= max ? v : null;
+}
+
+function scoreValue(s) {
+  if (!keyed()) return manualValue(s);
+  if (!takenSections().includes(s)) return null;
+  if (draft.useKey === false) return manualValue(s);
+  const v = keyResult().scores[s];
+  return v === undefined ? null : v;
 }
 
 function enteredSections() {
-  return ALL_SECTIONS.filter((s) => scoreValue(s) !== null);
+  return keyed() ? takenSections() : ALL_SECTIONS.filter((s) => manualValue(s) !== null);
 }
 
 /** Every marked question in order, as tag keys. */
 function markedKeys() {
   const keys = [];
+  const secs = enteredSections();
   for (const s of ALL_SECTIONS) {
-    if (scoreValue(s) === null) continue;
+    if (!secs.includes(s)) continue;
     const nums = Object.keys(draft.marks[s]).map(Number).sort((a, b) => a - b);
     for (const n of nums) keys.push(`${s}:${n}`);
   }
@@ -151,13 +190,16 @@ export function render(el, ctx) {
   }
 
   const draw = () => {
+    const ids = stepIds();
+    draft.step = Math.min(draft.step, ids.length - 1);
     const step = draft.step;
+    const views = { source: stepSource, scores: stepScores, misses: stepMisses, tag: stepTag };
     setHTML(
       el,
-      html`${topbar(editId ? 'Edit test' : 'Log a test', { back: editId ? `#/tests/${editId}` : '#/tests', eyebrow: `Step ${step + 1} of ${STEPS.length}: ${STEPS[step]}` })}
+      html`${topbar(editId ? 'Edit test' : 'Log a test', { back: editId ? `#/tests/${editId}` : '#/tests', eyebrow: `Step ${step + 1} of ${ids.length}: ${STEP_LABELS[ids[step]]}` })}
         <div class="stack-lg">
-          <div class="steps">${STEPS.map((_, i) => html`<span class="${i <= step ? 'on' : ''}"></span>`)}</div>
-          ${[stepSource, stepScores, stepMisses, stepTag][step]()}
+          <div class="steps">${ids.map((_, i) => html`<span class="${i <= step ? 'on' : ''}"></span>`)}</div>
+          ${views[ids[step]]()}
         </div>`,
     );
     saveDraft();
@@ -224,6 +266,19 @@ export function render(el, ctx) {
     if (action === 'tag-next') return tagMove(1);
     if (action === 'tag-prev') return tagMove(-1);
     if (action === 'save') return save();
+    if (action === 'edit-scores') {
+      // Start from the key's scores; the edited ones stick until "Use key scores".
+      const r = keyResult();
+      for (const sec of ALL_SECTIONS) draft.scores[sec] = r.scores[sec] ? String(r.scores[sec]) : '';
+      draft.useKey = false;
+      draw();
+      return;
+    }
+    if (action === 'use-key') {
+      draft.useKey = true;
+      draw();
+      return;
+    }
     if (action === 'discard') {
       const ok = await confirmSheet({ title: 'Discard this test?', body: 'The scores and marks you entered here will be cleared.', confirmLabel: 'Discard', danger: true });
       if (!ok) return;
@@ -238,6 +293,7 @@ export function render(el, ctx) {
     if (t.dataset.score) {
       draft.scores[t.dataset.score] = t.value.replace(/[^0-9]/g, '').slice(0, 2);
       updateComposite(el);
+      refreshKeySummary(el);
       saveDraft();
     } else if (t.name === 'date' || t.name === 'notes') {
       draft[t.name] = t.value;
@@ -246,6 +302,12 @@ export function render(el, ctx) {
   });
   el.addEventListener('change', (e) => {
     const t = e.target;
+    if (t.dataset.taken) {
+      readPacing(el);
+      draft.taken = { ...draft.taken, [t.dataset.taken]: t.checked };
+      draw();
+      return;
+    }
     if (t.name === 'sourceId' && t.value === '__add') {
       // Add the test right here, then pick it.
       t.value = draft.sourceId || '';
@@ -281,20 +343,20 @@ export function render(el, ctx) {
       }
       return;
     }
-    if (draft.step === 2) readPacing(el);
-    if (draft.step === 2 && !markedKeys().length) {
+    if (stepId() === 'misses') readPacing(el);
+    if (stepId() === 'misses' && !markedKeys().length) {
       // No misses to tag: save right away.
       return save();
     }
-    draft.step = Math.min(STEPS.length - 1, draft.step + 1);
-    if (draft.step === 2 && scoreValue(draft.activeSection) === null) draft.activeSection = enteredSections()[0];
-    if (draft.step === 3) draft.tagIndex = Math.min(draft.tagIndex, markedKeys().length - 1);
+    draft.step = Math.min(stepIds().length - 1, draft.step + 1);
+    if (stepId() === 'misses' && !keyed() && scoreValue(draft.activeSection) === null) draft.activeSection = enteredSections()[0];
+    if (stepId() === 'tag') draft.tagIndex = Math.min(draft.tagIndex, markedKeys().length - 1);
     draw();
     window.scrollTo(0, 0);
   }
   function back() {
-    if (draft.step === 2) readPacing(el);
-    if (draft.step === 3) readTagText(el);
+    if (stepId() === 'misses') readPacing(el);
+    if (stepId() === 'tag') readTagText(el);
     draft.step = Math.max(0, draft.step - 1);
     draw();
   }
@@ -309,8 +371,8 @@ export function render(el, ctx) {
     window.scrollTo(0, 0);
   }
   async function save() {
-    if (draft.step === 3) readTagText(el);
-    if (draft.step === 2) readPacing(el);
+    if (stepId() === 'tag') readTagText(el);
+    if (stepId() === 'misses') readPacing(el);
     const btns = el.querySelectorAll('[data-action=save], [data-action=tag-next], [data-action=next]');
     btns.forEach((x) => (x.disabled = true));
     try {
@@ -335,11 +397,18 @@ function currentTag() {
 }
 
 function validateStep() {
-  if (draft.step === 0) {
+  if (stepId() === 'source') {
     if (!isISODate(draft.date)) return 'Pick the date you took it.';
     if (draft.kind !== 'real' && draft.kind !== 'benchmark' && draft.kind !== 'other' && !draft.sourceId) return 'Pick which test you took.';
   }
-  if (draft.step === 1) {
+  if (stepId() === 'misses' && keyed()) {
+    if (!takenSections().length) return 'Turn on at least one section you took.';
+    if (draft.useKey === false) {
+      const bad = takenSections().filter((s) => manualValue(s) === null);
+      if (bad.length) return `Scores run from 1 to 36. Check ${bad.map((s) => SECTIONS[s].label).join(', ')}.`;
+    }
+  }
+  if (stepId() === 'scores') {
     const bad = ALL_SECTIONS.filter((s) => draft.scores[s] !== '' && scoreValue(s) === null);
     if (bad.length) return `Scores run from 1 to ${draft.scale === 35 ? 35 : 36}. Check ${bad.map((s) => SECTIONS[s].label).join(', ')}.`;
     if (!enteredSections().length) return 'Enter at least one section score.';
@@ -400,15 +469,18 @@ function stepSource() {
           ${!mats.some((m) => m.format === 'legacy') ? html`<span class="hint">Add legacy tests in Settings to see them here.</span>` : ''}
         </div>`
       : ''}
-    <div class="grid-2">
-      <div class="field"><label for="te-date">Date taken</label><input class="input" id="te-date" type="date" name="date" value="${draft.date}"></div>
-      <div class="field"><label for="te-scale">Score scale</label>
-        <select class="input" id="te-scale" name="scale">
-          <option value="36" ${draft.scale === 36 ? html`selected` : ''}>1 to 36</option>
-          <option value="35" ${draft.scale === 35 ? html`selected` : ''}>1 to 35</option>
-        </select>
-      </div>
-    </div>
+    ${keyed()
+      ? html`<div class="field"><label for="te-date">Date taken</label><input class="input" id="te-date" type="date" name="date" value="${draft.date}"></div>
+          <p class="hint">This test's answer key is built in. Mark your misses and the app works out your scores.</p>`
+      : html`<div class="grid-2">
+          <div class="field"><label for="te-date">Date taken</label><input class="input" id="te-date" type="date" name="date" value="${draft.date}"></div>
+          <div class="field"><label for="te-scale">Score scale</label>
+            <select class="input" id="te-scale" name="scale">
+              <option value="36" ${draft.scale === 36 ? html`selected` : ''}>1 to 36</option>
+              <option value="35" ${draft.scale === 35 ? html`selected` : ''}>1 to 35</option>
+            </select>
+          </div>
+        </div>`}
     <div class="field"><label for="te-notes">Notes</label><input class="input" id="te-notes" name="notes" maxlength="200" value="${draft.notes}" placeholder="Optional, e.g. tired, took it in two sittings"></div>
     <p class="error-text" data-error hidden></p>
     <div class="sticky-actions">
@@ -441,9 +513,12 @@ function stepScores() {
 }
 
 function stepMisses() {
-  const secs = enteredSections();
+  const isKeyed = keyed();
+  const secs = isKeyed ? [...ALL_SECTIONS] : enteredSections();
   const s = secs.includes(draft.activeSection) ? draft.activeSection : secs[0];
   draft.activeSection = s;
+  const took = !isKeyed || takenSections().includes(s);
+  const unscored = new Set(isKeyed && FORMS[draft.sourceId][s] ? FORMS[draft.sourceId][s].unscored : []);
   const n = questionCount(s);
   const marks = draft.marks[s];
   const missCount = Object.values(marks).filter((v) => v === 'miss').length;
@@ -453,21 +528,32 @@ function stepMisses() {
   const stepper = (field, label, hint) => html`<div class="day-row"><div class="grow"><div class="strong small">${label}</div><div class="hint">${hint}</div></div>
     <div class="stepper"><button type="button" data-step-pacing="${s}:${field}:-1" aria-label="Less">-</button><output data-pacing-out="${s}:${field}">${p[field] || 0}</output><button type="button" data-step-pacing="${s}:${field}:1" aria-label="More">+</button></div></div>`;
   return html`<div class="stack-lg">
+    ${isKeyed ? html`<div class="card stack-sm" data-key-summary>${keySummary()}</div>` : ''}
     <div class="seg" role="tablist">
       ${secs.map((x) => {
         const c = Object.keys(draft.marks[x]).length;
         return html`<button type="button" data-sec-tab="${x}" aria-pressed="${x === s}">${SECTIONS[x].label}${c ? ` (${c})` : ''}</button>`;
       })}
     </div>
-    <div class="card stack">
+    ${isKeyed
+      ? html`<label class="check-row card"><span class="grow strong">I took ${SECTIONS[s].label}</span><span class="switch"><input type="checkbox" data-taken="${s}" ${took ? html`checked` : ''}><span></span></span></label>`
+      : ''}
+    ${took ? missGrid() : ''}
+    <p class="error-text" data-error hidden></p>
+    <div class="sticky-actions"><button class="btn btn-secondary" data-action="back">Back</button>
+      <button class="btn" data-action="next">${total ? `Tag ${plural(total, 'question')}` : 'Save test'}</button></div>
+  </div>`;
+
+  function missGrid() {
+    return html`<div class="card stack">
       <div class="spread"><h2>${SECTIONS[s].label} misses</h2><span class="small muted" data-grid-count>${countText(missCount, guessCount)}</span></div>
       <p class="small muted">Tap a question you missed. Long-press one you got right only by guessing.</p>
       <div class="qgrid sec-${s}" data-grid="${s}">
-        ${Array.from({ length: n }, (_, i) => i + 1).map((q) => html`<button type="button" class="q" data-q="${q}" data-state="${marks[q] || ''}" aria-label="Question ${q}${marks[q] === 'miss' ? ', missed' : marks[q] === 'guess' ? ', guessed right' : ''}">${q}</button>`)}
+        ${Array.from({ length: n }, (_, i) => i + 1).map((q) => html`<button type="button" class="q${unscored.has(q) ? ' q-unscored' : ''}" data-q="${q}" data-state="${marks[q] || ''}" aria-label="${qLabel(q, marks[q], unscored.has(q))}">${q}</button>`)}
       </div>
-      <div class="legend"><span><i style="background:var(--danger)"></i>Missed</span><span><i style="background:var(--warn-soft);border:1.5px solid var(--warn)"></i>Guessed right</span></div>
+      <div class="legend"><span><i style="background:var(--danger)"></i>Missed</span><span><i style="background:var(--warn-soft);border:1.5px solid var(--warn)"></i>Guessed right</span>${unscored.size ? html`<span><i class="legend-unscored"></i>Not scored</span>` : ''}</div>
     </div>
-    <details class="card" ${draft.pacing[s] ? html`open` : ''}>
+    <details class="card" ${p.notReached || p.guessedAtEnd || p.minutesLeft ? html`open` : ''}>
       <summary class="strong">Pacing for ${SECTIONS[s].label} <span class="small muted">(optional)</span></summary>
       <div class="mt">
         ${stepper('notReached', 'Questions not reached', 'Never got to them')}
@@ -475,10 +561,52 @@ function stepMisses() {
         ${stepper('minutesLeft', 'Minutes left over', 'When you finished')}
       </div>
       <p class="notice notice-warn mt" data-timing-flag ${isTimingFlag(p) ? '' : html`hidden`}>Timing flag: this section will lean toward pacing drills.</p>
-    </details>
-    <div class="sticky-actions"><button class="btn btn-secondary" data-action="back">Back</button>
-      <button class="btn" data-action="next">${total ? `Tag ${plural(total, 'question')}` : 'Save test'}</button></div>
-  </div>`;
+    </details>`;
+  }
+}
+
+function qLabel(q, state, unscored) {
+  return `Question ${q}${unscored ? ', not scored' : ''}${state === 'miss' ? ', missed' : state === 'guess' ? ', guessed right' : ''}`;
+}
+
+/** Live scores for a keyed test: raw out of scored questions, the scale score, composite, and STEM. */
+function keySummary() {
+  const taken = takenSections();
+  const r = keyResult();
+  const c = composite(scoreValue('english'), scoreValue('math'), scoreValue('reading'));
+  const st = stem(scoreValue('math'), scoreValue('science'));
+  const editing = draft.useKey === false;
+  return html`<div class="spread"><span class="small muted strong">Composite</span>${st === null ? '' : html`<span class="badge badge-science">STEM ${st}</span>`}</div>
+    <div class="score-big">${c === null ? '--' : c}</div>
+    ${editing
+      ? html`<div class="grid-2">
+          ${taken.map(
+            (s) => html`<div class="field sec-${s}"><label for="sc-${s}">${SECTIONS[s].label}</label>
+              <input class="input input-score" id="sc-${s}" data-score="${s}" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="${draft.scores[s]}" placeholder="--" autocomplete="off"></div>`,
+          )}
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" data-action="use-key">Use key scores</button>`
+      : html`<ul class="key-lines">
+          ${taken.map((s) => html`<li><span class="sec-dot sec-${s}"></span>${SECTIONS[s].label}: ${r.detail[s].raw} of ${r.detail[s].scored} scored <span aria-label="gives">→</span> <strong>${r.detail[s].scale}</strong></li>`)}
+        </ul>
+        ${taken.length ? html`<button type="button" class="btn btn-ghost btn-sm" data-action="edit-scores">Edit scores</button>` : html`<p class="small muted">No sections on.</p>`}`}`;
+}
+
+/** Update the keyed summary in place (keeps focus in a score box while typing). */
+function refreshKeySummary(el) {
+  const box = el.querySelector('[data-key-summary]');
+  if (!box || !keyed()) return;
+  if (draft.useKey === false) {
+    // Only the totals change while typing; redrawing would drop the cursor.
+    const c = composite(scoreValue('english'), scoreValue('math'), scoreValue('reading'));
+    const st = stem(scoreValue('math'), scoreValue('science'));
+    const big = box.querySelector('.score-big');
+    if (big) big.textContent = c === null ? '--' : String(c);
+    const badge = box.querySelector('.badge-science');
+    if (badge) badge.textContent = st === null ? '' : `STEM ${st}`;
+    return;
+  }
+  setHTML(box, keySummary());
 }
 
 function countText(missCount, guessCount) {
@@ -495,12 +623,18 @@ function stepTag() {
   const t = draft.tags[key] || { topic: '', cause: '' };
   const guessed = draft.marks[s][q] === 'guess';
   const isLast = i === keys.length - 1;
+  const k = keyed() ? keyFor(draft.sourceId, s, q) : null;
+  const likely = k && k.category ? (CATEGORY_TOPICS[s] || {})[k.category] || [] : [];
+  const sub = [`${i + 1} of ${keys.length}`];
+  if (guessed) sub.push('Guessed right, counts at half weight');
+  else if (k && k.unscored) sub.push('Counts at half weight');
   return html`<div class="stack-lg" data-tag-card>
     <div class="tag-head sec-${s}">
       <div class="qnum">${q}</div>
-      <div class="grow"><div class="strong">${SECTIONS[s].label}, question ${q}</div><div class="small muted">${i + 1} of ${keys.length}${guessed ? '. Guessed right, counts at half weight' : ''}</div></div>
+      <div class="grow"><div class="strong">${SECTIONS[s].label}, question ${q}</div><div class="small muted">${sub.join('. ')}</div></div>
+      ${k ? html`<div class="key-tags">${k.unscored ? html`<span class="badge badge-muted">Not scored</span>` : ''}<span class="badge">Key: ${k.answer}</span></div>` : ''}
     </div>
-    <div class="field"><span class="label">Topic</span>${topicPicker(s, t.topic, store.state.settings.customTopics)}</div>
+    <div class="field"><span class="label">Topic${k && k.category ? html` <span class="hint">Key category: ${CATEGORY_NAMES[k.category] || k.category}</span>` : ''}</span>${topicPicker(s, t.topic, store.state.settings.customTopics, likely)}</div>
     <div class="field"><span class="label">${guessed ? 'Why were you unsure?' : 'Why did you miss it?'}</span>${causePicker(t.cause)}</div>
     <details ${t.note || t.myAnswer || t.correctAnswer ? html`open` : ''}>
       <summary class="strong small">Add a note or answer choices</summary>
@@ -532,7 +666,7 @@ function bindGrid(el) {
     if (state) draft.marks[s][q] = state;
     else delete draft.marks[s][q];
     btn.dataset.state = state || '';
-    btn.setAttribute('aria-label', `Question ${q}${state === 'miss' ? ', missed' : state === 'guess' ? ', guessed right' : ''}`);
+    btn.setAttribute('aria-label', qLabel(q, state, btn.classList.contains('q-unscored')));
     const counter = el.querySelector('[data-grid-count]');
     if (counter) {
       const vals = Object.values(draft.marks[s]);
@@ -543,7 +677,8 @@ function bindGrid(el) {
     if (tabBtn) tabBtn.textContent = `${SECTIONS[s].label}${c ? ` (${c})` : ''}`;
     const nextBtn = el.querySelector('[data-action=next]');
     const total = markedKeys().length;
-    if (nextBtn && draft.step === 2) nextBtn.textContent = total ? `Tag ${plural(total, 'question')}` : 'Save test';
+    if (keyed()) refreshKeySummary(el);
+    if (nextBtn && stepId() === 'misses') nextBtn.textContent = total ? `Tag ${plural(total, 'question')}` : 'Save test';
     saveDraft();
   };
   el.addEventListener('pointerdown', (e) => {
@@ -591,8 +726,10 @@ async function persist() {
     kind: draft.kind,
     sourceId: draft.sourceId && draft.sourceId !== 'other' ? draft.sourceId : null,
     scores,
-    scale: draft.scale,
+    scale: keyed() ? 36 : draft.scale,
     notes: (draft.notes || '').trim(),
+    // 'key' means the scores follow the built-in answer key; edited or typed scores are 'manual'.
+    scoredBy: keyed() ? (draft.useKey === false ? 'manual' : 'key') : 'manual',
     createdAt: (store.state.attempts.find((a) => a.id === id) || {}).createdAt || store.nowISO(),
   };
   const pacing = Object.entries(draft.pacing)
@@ -608,6 +745,7 @@ async function persist() {
       topic: t.topic || '',
       cause: t.cause || 'content',
       guessedRight: draft.marks[section][q] === 'guess',
+      unscored: keyed() ? Boolean((keyFor(draft.sourceId, section, q) || {}).unscored) : false,
       note: t.note || '',
       myAnswer: t.myAnswer || '',
       correctAnswer: t.correctAnswer || '',

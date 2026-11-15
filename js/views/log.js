@@ -121,7 +121,7 @@ function missCard(m, source) {
   return html`<article class="miss ${secClass(m.section)}">
     <div class="miss-head">
       <div class="stack-sm grow">
-        <div class="row-wrap">${sectionBadge(m.section)}${causeBadge(m.cause, m.guessedRight)}${m.guessedRight ? causeBadge(m.cause) : ''}
+        <div class="row-wrap">${sectionBadge(m.section)}${causeBadge(m.cause, m.guessedRight)}${m.guessedRight ? causeBadge(m.cause) : ''}${m.unscored ? html`<span class="badge">Not scored</span>` : ''}
           ${redo && redo.status === 'persistent' ? html`<span class="badge badge-danger">Persistent</span>` : ''}
           ${redo && redo.status === 'retired' ? html`<span class="badge badge-success">Retired</span>` : ''}
         </div>

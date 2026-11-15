@@ -1,7 +1,8 @@
 // App state: loads everything from IndexedDB into memory, runs actions, and keeps the plan current.
 import * as db from './db.js';
 import { defaultSettings } from './data/calendar.js';
-import { buildMaterials } from './data/materials.js';
+import { buildMaterials, duplicatesBuiltIn } from './data/materials.js';
+import { keyFor } from './data/forms.js';
 import { ALL_SECTIONS, CORE_SECTIONS } from './data/act.js';
 import { computeFocus } from './logic/focus.js';
 import { generateWeek, heavyNight as planHeavyNight, rescheduleTask as planReschedule, rescheduleProblem } from './logic/planner.js';
@@ -154,8 +155,25 @@ export async function init() {
   state.settings = withDefaults(stored);
   if (!stored) await db.put('settings', state.settings);
   state.ready = true;
+  await dropDuplicateTests();
   await ensureWeek();
   emit();
+}
+
+/**
+ * Official Practice Tests 1 to 4 are built in now. A copy the user added by hand before that
+ * is removed, as long as nothing was logged or planned with it.
+ */
+async function dropDuplicateTests() {
+  const list = state.settings.customMaterials || [];
+  const used = (id) =>
+    state.attempts.some((a) => a.sourceId === id) ||
+    state.misses.some((m) => m.sourceId === id) ||
+    state.materialUse.some((u) => u.sourceId === id) ||
+    (state.settings.fullTests || []).some((f) => f.sourceId === id) ||
+    state.tasks.some((t) => t.status !== 'todo' && t.materialRef && t.materialRef.sourceId === id);
+  const keep = list.filter((c) => !(duplicatesBuiltIn(c) && !used(c.sourceId)));
+  if (keep.length !== list.length) await saveSettings({ customMaterials: keep });
 }
 
 async function reloadFromDB() {
@@ -247,6 +265,12 @@ function materialUseForAttempt(attempt) {
   }));
 }
 
+/** Unscored per the official key when the test is keyed, otherwise whatever the miss says. */
+function isUnscored(m) {
+  const k = m.sourceId && m.questionNumber ? keyFor(m.sourceId, m.section, m.questionNumber) : null;
+  return k ? k.unscored : !!m.unscored;
+}
+
 function cleanMiss(m) {
   return {
     id: m.id,
@@ -261,6 +285,7 @@ function cleanMiss(m) {
     note: m.note || '',
     fixLine: m.fixLine || '',
     guessedRight: !!m.guessedRight,
+    unscored: isUnscored(m),
     date: m.date || dateOf(m.createdAt) || today(),
     createdAt: m.createdAt || nowISO(),
     explanation: m.explanation || null,

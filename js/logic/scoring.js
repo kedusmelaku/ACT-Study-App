@@ -132,3 +132,47 @@ export function hasAllCore(scores = {}) {
 }
 
 export { isScore };
+
+// ---------------------------------------------------------------- keyed tests
+
+/** Scale score for a raw score from a key's conversion table (table[raw]), clamped to the table. */
+export function scaleFromRaw(table, raw) {
+  if (!Array.isArray(table) || !table.length) return null;
+  const r = Math.max(0, Math.min(table.length - 1, Math.floor(Number(raw) || 0)));
+  return table[r];
+}
+
+/**
+ * Raw and scale score for one keyed section from the marked questions.
+ * `marks` maps question number to 'miss' or 'guess'. Guessed-right questions were answered right,
+ * so they aren't misses. Misses on unscored questions don't lower the raw score.
+ */
+export function keyedSection(formSection, marks = {}) {
+  if (!formSection) return null;
+  const unscored = new Set(formSection.unscored);
+  const scored = formSection.total - unscored.size;
+  let missed = 0;
+  for (const [q, v] of Object.entries(marks)) {
+    const n = Number(q);
+    if (v === 'miss' && n >= 1 && n <= formSection.total && !unscored.has(n)) missed++;
+  }
+  const raw = Math.max(0, scored - missed);
+  return { raw, scored, scale: scaleFromRaw(formSection.table, raw) };
+}
+
+/**
+ * Scores for a keyed test. `form` is a FORMS entry, `marks` is { section: { q: state } },
+ * `taken` lists the sections taken. Returns { scores, detail } where detail has raw and scored per section.
+ */
+export function keyedScores(form, marks = {}, taken = []) {
+  const scores = {};
+  const detail = {};
+  if (!form) return { scores, detail };
+  for (const s of ALL_SECTIONS) {
+    if (!taken.includes(s) || !form[s]) continue;
+    const d = keyedSection(form[s], marks[s] || {});
+    detail[s] = d;
+    scores[s] = d.scale;
+  }
+  return { scores, detail };
+}

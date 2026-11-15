@@ -2,6 +2,7 @@
 import { ALL_SECTIONS } from './act.js';
 
 const ALL = Object.freeze([...ALL_SECTIONS]);
+const HUB_URL = 'https://act.org/content/act/en/products-and-services/the-act/test-preparation/free-act-test-prep.html';
 
 /**
  * Seed inventory. Fields:
@@ -12,37 +13,26 @@ const ALL = Object.freeze([...ALL_SECTIONS]);
  *  needsSetup: the user must add a name or URL in Settings first
  */
 export const SEED_MATERIALS = Object.freeze([
-  {
-    sourceId: 'enhanced-1',
-    title: 'Official Enhanced Practice Test 1',
-    short: 'Practice Test 1',
+  // Official Practice Tests 1 to 4. Their scoring keys are in forms.js, so logging one scores it from misses.
+  ...[1, 2, 3, 4].map((n) => ({
+    sourceId: `enhanced-${n}`,
+    title: `Official Practice Test ${n}`,
+    short: `Practice Test ${n}`,
     kind: 'practice_test',
     sections: ALL,
-    url: 'https://www.act.org/content/dam/act/secured/documents/Preparing-for-the-ACT.pdf',
-    notes: 'Free PDF. A digital version is also available through MyACT.',
+    url: HUB_URL,
+    notes: 'Free, on the ACT test prep hub.',
     format: 'enhanced',
     fullLength: true,
     holdForFullTest: true,
-  },
-  {
-    sourceId: 'enhanced-2',
-    title: 'Official Enhanced Practice Test 2',
-    short: 'Practice Test 2',
-    kind: 'practice_test',
-    sections: ALL,
-    url: 'https://www.act.org/content/dam/act/unsecured/documents/ACT-Test-Prep-ACT-Practice-Test-2-Form.pdf',
-    notes: 'Free PDF.',
-    format: 'enhanced',
-    fullLength: true,
-    holdForFullTest: true,
-  },
+  })),
   {
     sourceId: 'act-hub',
     title: 'ACT free test prep hub',
     short: 'ACT QuizMe',
     kind: 'quiz',
     sections: ALL,
-    url: 'https://act.org/content/act/en/products-and-services/the-act/test-preparation/free-act-test-prep.html',
+    url: HUB_URL,
     notes: 'Digital practice tests, QuizMe subject quizzes, and Question of the Day.',
     format: null,
     fullLength: false,
@@ -172,4 +162,13 @@ export function findMaterial(materials, sourceId) {
 /** Sources that make sense to pick when logging a test attempt. */
 export function attemptSources(materials) {
   return materials.filter((m) => m.available && (m.fullLength || m.custom));
+}
+
+/**
+ * True when a test the user added is one of the built-in Official Practice Tests 1 to 4 under another
+ * name (added before those were built in). Callers remove it only when nothing refers to it.
+ */
+export function duplicatesBuiltIn(custom) {
+  const t = String((custom && custom.title) || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  return /^(the )?(official )?(act )?(enhanced )?(online )?practice test #?[1-4]$/.test(t);
 }

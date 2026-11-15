@@ -76,7 +76,7 @@ function runSeason(variant) {
       if (gen.length && all > dayCapacity(d, settings) + 10 && !week.some((t) => t.date === d && (t.fixed || t.pinned || t.status !== 'todo'))) fail(day, 'over capacity', { d, all, cap: dayCapacity(d, settings) });
     }
     // Official enhanced tests only in full tests.
-    for (const t of week) if (t.type !== 'full_test' && t.materialRef && ['enhanced-1', 'enhanced-2'].includes(t.materialRef.sourceId)) fail(day, 'official test used in drill', t);
+    for (const t of week) if (t.type !== 'full_test' && t.materialRef && ['enhanced-1', 'enhanced-2', 'enhanced-3', 'enhanced-4'].includes(t.materialRef.sourceId)) fail(day, 'official test used in drill', t);
     // Science at most one drill slot per week.
     const sci = week.filter((t) => t.section === 'science' && (t.type === 'drill' || t.type === 'section_set') && t.origin === 'plan' && t.status !== 'moved');
     if (sci.length > 1) fail(day, 'science >1 slot', sci.map((t) => t.id));
