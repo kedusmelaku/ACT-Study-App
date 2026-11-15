@@ -8,12 +8,17 @@ import { formatDate } from '../logic/dates.js';
 
 export const live = true;
 
+/** "/35" after a score from a test scored out of 35, so 34 of 35 doesn't look like 34 of 36. */
+export function outOf(scale) {
+  return Number(scale) === 35 ? html`<small class="out-of">/35</small>` : '';
+}
+
 export function scoreRow(scores, scale) {
   return html`<div class="score-row">
     ${ALL_SECTIONS.map(
-      (s) => html`<div class="score-cell sec-${s}"><b>${scores && scores[s] ? scores[s] : '--'}</b><span>${SECTIONS[s].label}</span></div>`,
+      (s) => html`<div class="score-cell sec-${s}"><b>${scores && scores[s] ? html`${scores[s]}${outOf(scale)}` : '--'}</b><span>${SECTIONS[s].label}</span></div>`,
     )}
-  </div>${scale === 35 ? html`<p class="hint mt">Scored out of 35.</p>` : ''}`;
+  </div>`;
 }
 
 export function attemptTitle(a) {
@@ -61,7 +66,7 @@ export function render(el) {
                       ${st ? html`<span class="badge">STEM ${st}</span>` : ''}
                     </div>
                   </div>
-                  <div class="center"><div class="score-big" style="font-size:1.7rem">${c ?? '--'}</div><div class="tiny muted">${a.kind === 'real' ? 'Real' : 'Practice'}</div></div>
+                  <div class="center"><div class="score-big" style="font-size:1.7rem">${c ?? '--'}${c ? outOf(a.scale) : ''}</div><div class="tiny muted">${a.kind === 'real' ? 'Real' : a.kind === 'benchmark' ? 'Benchmark' : 'Practice'}</div></div>
                 </a>`;
               })}
             </div>`

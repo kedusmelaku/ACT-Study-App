@@ -21,6 +21,7 @@ export function trendSeries(attempts) {
       date: a.date,
       kind: a.kind,
       real: a.kind === 'real',
+      scale: Number(a.scale) === 35 ? 35 : 36,
       scores: { ...a.scores },
       composite: compositeOf(a.scores),
       estComposite: estimatedComposite(estimates(upTo)),

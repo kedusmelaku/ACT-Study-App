@@ -760,3 +760,5 @@ summary { cursor: pointer; min-height: 32px; display: list-item; }
 .ts.uns.full { background: color-mix(in srgb, var(--sec) 50%, var(--surface)); border: 1.5px dashed var(--sec); }
 .ts[aria-current='true'] { outline: 2px solid var(--text); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .ts { transition: none; } }
+
+.out-of { font-size: 0.6em; font-weight: 600; opacity: 0.7; margin-left: 1px; }

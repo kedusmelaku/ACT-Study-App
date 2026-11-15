@@ -7,7 +7,7 @@ import { ALL_SECTIONS, SECTIONS, ATTEMPT_KINDS } from '../data/act.js';
 import { compositeOf, stemOf } from '../logic/scoring.js';
 import { isTimingFlag } from '../logic/focus.js';
 import { formatDate } from '../logic/dates.js';
-import { scoreRow, attemptTitle } from './tests.js';
+import { scoreRow, outOf, attemptTitle } from './tests.js';
 
 export const live = true;
 
@@ -31,7 +31,7 @@ export function render(el, ctx) {
         <section class="card stack">
           <div class="spread">
             <div><div class="tiny strong muted">COMPOSITE</div><span class="badge ${a.kind === 'real' ? 'badge-accent' : ''}">${ATTEMPT_KINDS[a.kind]?.label || 'Test'}</span></div>
-            <div class="row"><div class="score-big">${c ?? '--'}</div>${st ? html`<span class="badge badge-science">STEM ${st}</span>` : ''}</div>
+            <div class="row"><div class="score-big">${c ?? '--'}${c ? outOf(a.scale) : ''}</div>${st ? html`<span class="badge badge-science">STEM ${st}</span>` : ''}</div>
           </div>
           ${scoreRow(a.scores, a.scale)}
           ${a.notes ? html`<p class="small muted">${a.notes}</p>` : ''}
