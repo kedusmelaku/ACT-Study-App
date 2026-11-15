@@ -81,3 +81,26 @@ test('import: splits several sections, ignoring a repeated page header', () => {
   assert.deepEqual(parseResults(chunks[0]).results, ['correct', 'correct']);
   assert.equal(parseResults(chunks[1]).section, 'math');
 });
+
+// Made-up text in the online results layout: labels, the answer on the line after "Your Answer"
+// behind a bullet dot, and a NUMBER OF QUESTIONS line.
+const onlineLayout = [
+  'Result', 'ACT Practice 9 - Reading', 'Result Details', 'STARTED 1/1/2030, 9:00:00 AM', 'NUMBER OF QUESTIONS 2',
+  'Result Status', 'SCORE 1 of 2', 'Result Feedback', 'The ACT',
+  'The pretend narrator mostly feels:', 'Answer Feedback', 'Your Answer', 'calm about the made-up trip', '.', 'Result', 'Correct',
+  '2+', 'Based on Table 9 , the pretend value is about:', 'Answer Feedback', 'Your Answer', '. 12 units', 'Result', 'Incorrect',
+].join('\n');
+
+test('import: online layout skips labels and reads the answer on the next line', () => {
+  const p = parseResults(onlineLayout);
+  assert.equal(p.count, 2);
+  assert.deepEqual(p.results, ['correct', 'incorrect']);
+  assert.deepEqual(p.questions[0], { text: 'The pretend narrator mostly feels:', answer: 'calm about the made-up trip' });
+  assert.deepEqual(p.questions[1], { text: 'Based on Table 9, the pretend value is about:', answer: '12 units' });
+  assert.equal(checkResults(p, 2), null);
+});
+
+test('import fails: results found differ from the file\'s own question count', () => {
+  const p = parseResults(onlineLayout.replace('NUMBER OF QUESTIONS 2', 'NUMBER OF QUESTIONS 3'));
+  assert.match(checkResults(p, 2), /Found 2 results, but this file says it has 3 questions/);
+});
