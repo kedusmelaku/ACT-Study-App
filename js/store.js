@@ -2,11 +2,11 @@
 import * as db from './db.js';
 import { defaultSettings } from './data/calendar.js';
 import { buildMaterials } from './data/materials.js';
-import { ALL_SECTIONS } from './data/act.js';
+import { ALL_SECTIONS, CORE_SECTIONS } from './data/act.js';
 import { computeFocus } from './logic/focus.js';
 import { generateWeek, heavyNight as planHeavyNight, rescheduleTask as planReschedule, rescheduleProblem } from './logic/planner.js';
 import { createRedo, answerRedo as logicAnswerRedo } from './logic/redo.js';
-import { todayISO, isISODate, dateOf } from './logic/dates.js';
+import { todayISO, isISODate, dateOf, daysBetween } from './logic/dates.js';
 import { weekStartFor } from './logic/phase.js';
 import { incomingWrites, isSyncedSetting, KEY_PATHS } from './logic/sync.js';
 
@@ -301,14 +301,34 @@ export async function saveAttempt({ attempt, pacing = [], misses = [] }) {
   for (const u of state.materialUse.filter((u) => u.attemptId === attempt.id)) ops.push({ store: 'materialUse', type: 'delete', key: u.id });
   for (const u of use) ops.push({ store: 'materialUse', type: 'put', value: u });
 
-  // A logged full test marks its plan task done.
+  // A logged full test marks its plan task done. Taking a different full test than the one planned
+  // (within 3 days of that full-test day) counts too: the planned test stays unused for a later day.
   const doneTasks = [];
   if (attempt.sourceId) {
+    const mat = materials().find((m) => m.sourceId === attempt.sourceId);
+    const isFull = !!(mat && mat.fullLength) && CORE_SECTIONS.every((s) => attempt.scores && attempt.scores[s]);
+    const exact = state.tasks.find((t) => t.type === 'full_test' && t.status === 'todo' && t.materialRef && t.materialRef.sourceId === attempt.sourceId);
+    const near = !exact && isFull
+      ? state.tasks
+          .filter((t) => t.type === 'full_test' && t.status === 'todo' && Math.abs(daysBetween(t.date, attempt.date)) <= 3)
+          .sort((a, b) => Math.abs(daysBetween(a.date, attempt.date)) - Math.abs(daysBetween(b.date, attempt.date)))[0]
+      : null;
+    const fullTask = exact || near;
+    if (fullTask) doneTasks.push({ ...fullTask, status: 'done', takenSourceId: attempt.sourceId });
+    // Editing which test it was: a full-test day already done as the old test follows the change.
+    const prior = state.attempts.find((a) => a.id === attempt.id);
+    if (prior && prior.sourceId && prior.sourceId !== attempt.sourceId) {
+      for (const t of state.tasks) {
+        if (t.type === 'full_test' && t.status === 'done' && (t.takenSourceId || (t.materialRef && t.materialRef.sourceId)) === prior.sourceId) {
+          doneTasks.push({ ...t, takenSourceId: attempt.sourceId });
+        }
+      }
+    }
+    const planned = fullTask && fullTask.materialRef ? fullTask.materialRef.sourceId : null;
     for (const t of state.tasks) {
-      if (t.type === 'full_test' && t.status === 'todo' && t.materialRef && t.materialRef.sourceId === attempt.sourceId) {
+      if (t.type === 'log_test' && t.status === 'todo' && (t.logSourceId === attempt.sourceId || (planned && t.logSourceId === planned))) {
         doneTasks.push({ ...t, status: 'done' });
       }
-      if (t.type === 'log_test' && t.status === 'todo' && t.logSourceId === attempt.sourceId) doneTasks.push({ ...t, status: 'done' });
     }
   }
   for (const t of doneTasks) ops.push({ store: 'tasks', type: 'put', value: t });

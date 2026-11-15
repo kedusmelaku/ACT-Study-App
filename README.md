@@ -102,6 +102,8 @@ Set these in Vercel. Never commit them.
 - **Priority** = 0.6 x leverage + 0.4 x weakness. The top section gets at least half the week's drill slots.
 - **Drill type** comes from the section's most common cause in the last 14 days: topic drill, checking habit, timed pacing, or evidence drill.
 
+Took a test the app doesn't list (a newer official practice test, a book test)? Add it from the test picker when you log it, or in Settings, Materials. It's tracked like the built-in ones.
+
 Full-test days, taper week (review only from Monday, no study Thursday and Friday), and the test-day screen come from the calendar in Settings. See `DECISIONS.md` for every judgment call.
 
 ## Privacy

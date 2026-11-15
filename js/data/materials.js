@@ -140,18 +140,24 @@ export function buildMaterials(settings = {}) {
     }
     out.push({ ...m, available: true });
   }
+  // Tests the user added (for example, a newer official practice test).
+  // format 'enhanced' = full test in today's format, 'legacy' = older format, null = something else.
   for (const c of settings.customMaterials || []) {
     if (!c || !c.sourceId) continue;
+    const format = c.format === 'enhanced' || c.format === 'legacy' ? c.format : null;
+    const fullLength = c.fullLength ?? !!format;
     out.push({
       sourceId: c.sourceId,
-      title: c.title || 'Custom source',
-      short: c.title || 'Custom source',
-      kind: c.fullLength ? 'practice_test' : 'other',
+      title: c.title || 'Your test',
+      short: c.title || 'Your test',
+      kind: fullLength ? 'practice_test' : 'other',
       sections: ALL,
       url: c.url || '',
       notes: 'Added by you.',
-      format: c.format || null,
-      fullLength: !!c.fullLength,
+      format,
+      fullLength,
+      // Official enhanced tests are saved for full timed tests, like Practice Tests 1 and 2.
+      holdForFullTest: c.hold ?? format === 'enhanced',
       available: true,
       custom: true,
     });
@@ -165,5 +171,5 @@ export function findMaterial(materials, sourceId) {
 
 /** Sources that make sense to pick when logging a test attempt. */
 export function attemptSources(materials) {
-  return materials.filter((m) => m.fullLength && m.available);
+  return materials.filter((m) => m.available && (m.fullLength || m.custom));
 }

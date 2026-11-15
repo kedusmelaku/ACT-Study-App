@@ -150,3 +150,10 @@ Judgment calls made without asking. One line each: what, then why.
 - Onboarding asks for each person's own test date (or "I don't have a date yet") and optional recent scores with their kind and scale; nothing is prefilled.
 - New installs start with no dates; full-test days come from the chosen test date (first Saturday, and the Saturday two weeks before the taper). Adding a test date later with no full tests coming up adds them the same way. The original December 2026 calendar is kept as a preset for tests.
 - Claude prompts describe the student by their own estimated composite instead of a fixed "34+ junior with AP classes", and use "they".
+
+## Adding your own tests
+- Any test the app doesn't list can be added (Settings, Materials, Add a test, or "+ Add a test that isn't listed" while logging a test) with a name, a type (full practice test in today's format, older practice test, or something else), and an optional link.
+- Added full practice tests in today's format are saved for full timed tests like Practice Tests 1 and 2, and the planner uses them once those are taken; older-format ones feed section practice like legacy tests.
+- Logging a full practice test within 3 days of a planned full-test day counts as that day, even if it was a different test; the planned test stays unused for a later full-test day. Editing which test an attempt was moves this along with it.
+- "Something else" in test entry is now labeled "(not tracked)", since it doesn't record which test it was.
+- Added tests can be renamed or relinked any time, and removed only while no attempt uses them.

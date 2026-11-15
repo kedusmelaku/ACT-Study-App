@@ -221,3 +221,35 @@ test('other tasks cannot be moved onto a full-test day', async () => {
   assert.equal(rescheduleProblem(drill, '2026-11-25', '2026-11-16', mkSettings()), 'That day is saved for a full test. Pick another day.');
   assert.equal(rescheduleProblem(drill, '2026-11-24', '2026-11-16', mkSettings()), null);
 });
+
+test('a test you add yourself is saved for full tests and used once 1 and 2 are taken', async () => {
+  const { buildMaterials } = await import('../js/data/materials.js');
+  const s = mkSettings({ customMaterials: [{ sourceId: 'custom-pt3', title: 'Official Enhanced Practice Test 3', format: 'enhanced' }] });
+  const pt3 = buildMaterials(s).find((m) => m.sourceId === 'custom-pt3');
+  assert.equal(pt3.fullLength, true);
+  assert.equal(pt3.holdForFullTest, true);
+  // With 1 and 2 already logged, the next full-test day gets the added test, and drills never use it.
+  const attempts = [
+    bench,
+    attempt('p1', '2026-11-07', 'official_enhanced', { english: 34, math: 34, reading: 33 }),
+    attempt('p2', '2026-11-14', 'official_enhanced', { english: 34, math: 34, reading: 33 }),
+  ];
+  attempts[1].sourceId = 'enhanced-1';
+  attempts[2].sourceId = 'enhanced-2';
+  const w = plan({ weekStart: '2026-11-21', today: '2026-11-21', s, attempts, misses: [miss('reading', 'Inference', 'trap', '2026-11-20')] });
+  const full = w.tasks.find((t) => t.type === 'full_test');
+  assert.equal(full.materialRef.sourceId, 'custom-pt3');
+  assert.ok(!w.tasks.some((t) => t.type !== 'full_test' && t.materialRef && t.materialRef.sourceId === 'custom-pt3'));
+});
+
+test('a full-test day done with a different test asks for no "log" task once that test is logged', () => {
+  const first = plan({ weekStart: '2026-11-07', today: '2026-11-07' });
+  const tasks = first.tasks.map((t) => (t.type === 'full_test' ? { ...t, status: 'done', takenSourceId: 'custom-pt3' } : t));
+  const pt3 = { ...attempt('p3', '2026-11-07', 'official_enhanced', { english: 34, math: 34, reading: 33 }), sourceId: 'custom-pt3' };
+  const s = mkSettings({ customMaterials: [{ sourceId: 'custom-pt3', title: 'Official Enhanced Practice Test 3', format: 'enhanced' }] });
+  const again = plan({ weekStart: '2026-11-07', today: '2026-11-08', existingTasks: tasks, s, attempts: [bench, pt3] });
+  assert.ok(!again.tasks.some((t) => t.type === 'log_test' && t.status === 'todo'));
+  // Practice Test 1 was never used, so it is still free for the next full-test day.
+  const later = plan({ weekStart: '2026-11-21', today: '2026-11-21', s: { ...s, fullTests: [{ date: '2026-11-25', sourceId: 'enhanced-2' }] }, attempts: [bench, pt3] });
+  assert.equal(later.tasks.find((t) => t.type === 'full_test').materialRef.sourceId, 'enhanced-2');
+});

@@ -470,7 +470,9 @@ export function generateWeek({ weekStart, today, settings, focus, redos = [], ma
     if (keptFull) {
       fullTestDays.add(d);
       // A skipped full test has nothing to log, and its test stays unused for a later full-test day.
-      if (keptFull.status !== 'skipped' && keptFull.status !== 'moved' && keptFull.materialRef && !usedSources.has(keptFull.materialRef.sourceId)) {
+      // A full test taken as a different test than planned counts as logged once that test is logged.
+      const takenAs = keptFull.takenSourceId || (keptFull.materialRef && keptFull.materialRef.sourceId);
+      if (keptFull.status !== 'skipped' && keptFull.status !== 'moved' && keptFull.materialRef && !usedSources.has(takenAs)) {
         logTaskFor.push({ date: d, sourceId: keptFull.materialRef.sourceId, title: keptFull.title });
       }
       continue;

@@ -8,6 +8,7 @@ import { composite, stem } from '../logic/scoring.js';
 import { isTimingFlag } from '../logic/focus.js';
 import { isISODate } from '../logic/dates.js';
 import { topicPicker, causePicker, promptNewTopic } from './miss-form.js';
+import { addTestSheet } from './add-test.js';
 
 export const live = false;
 
@@ -245,6 +246,18 @@ export function render(el, ctx) {
   });
   el.addEventListener('change', (e) => {
     const t = e.target;
+    if (t.name === 'sourceId' && t.value === '__add') {
+      // Add the test right here, then pick it.
+      t.value = draft.sourceId || '';
+      addTestSheet().then((entry) => {
+        if (!entry) return;
+        draft.sourceId = entry.sourceId;
+        if (draft.kind !== 'real' && draft.kind !== 'benchmark') draft.kind = kindForSource(entry.sourceId);
+        pruneMarks();
+        draw();
+      });
+      return;
+    }
     if (t.name === 'sourceId') {
       draft.sourceId = t.value;
       if (draft.kind !== 'real' && draft.kind !== 'benchmark') draft.kind = kindForSource(t.value);
@@ -381,7 +394,8 @@ function stepSource() {
           <select class="input" id="te-source" name="sourceId">
             <option value="">Choose a test</option>
             ${mats.map((m) => html`<option value="${m.sourceId}" ${draft.sourceId === m.sourceId ? html`selected` : ''}>${m.title}${used.has(m.sourceId) ? ' (logged before)' : ''}</option>`)}
-            <option value="other" ${draft.sourceId === 'other' ? html`selected` : ''}>Something else</option>
+            <option value="other" ${draft.sourceId === 'other' ? html`selected` : ''}>Something else (not tracked)</option>
+            <option value="__add">+ Add a test that isn't listed</option>
           </select>
           ${!mats.some((m) => m.format === 'legacy') ? html`<span class="hint">Add legacy tests in Settings to see them here.</span>` : ''}
         </div>`

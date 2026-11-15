@@ -7,6 +7,7 @@ import { SECTIONS, ALL_SECTIONS } from '../data/act.js';
 import { SEED_MATERIALS } from '../data/materials.js';
 import { formatDate, isISODate, compareDates, dateOf } from '../logic/dates.js';
 import { defaultFullTests } from '../logic/phase.js';
+import { addTestSheet, removeTest } from './add-test.js';
 import { validateImport } from '../db.js';
 import { syncNow, createSyncSpace, joinSync, disableSync } from '../sync.js';
 import { formatSyncCode } from '../logic/sync.js';
@@ -110,11 +111,22 @@ export function render(el) {
           })}
           <button class="list-item" data-action="add-full"><span class="list-icon">${icon('plus')}</span><div class="grow strong">Add a full-test day</div></button>
         </div>
-        <p class="hint">Practice Tests 1 and 2 are saved for these days.</p>
+        <p class="hint">Official full practice tests are saved for these days.</p>
       </section>
 
       <section class="stack" id="materials">
         <div class="section-title"><h2>Materials</h2></div>
+        <div class="list">
+          ${(s.customMaterials || []).map((c) => {
+            const usedBy = store.state.attempts.filter((a) => a.sourceId === c.sourceId).length;
+            const kind = c.format === 'enhanced' ? 'Full practice test' : c.format === 'legacy' ? 'Older practice test' : 'Other';
+            return html`<div class="list-item"><span class="list-icon">${icon('tests')}</span>
+              <div class="grow"><div class="strong">${c.title}</div><div class="small muted">${kind}${usedBy ? `, logged ${plural(usedBy, 'time')}` : ''}</div></div>
+              <button class="icon-btn" data-edit-test="${c.sourceId}" aria-label="Edit ${c.title}">${icon('edit')}</button>
+              ${usedBy ? '' : html`<button class="icon-btn" data-remove-test="${c.sourceId}" aria-label="Remove ${c.title}">${icon('trash')}</button>`}</div>`;
+          })}
+          <button class="list-item" data-action="add-test-material"><span class="list-icon">${icon('plus')}</span><div class="grow"><div class="strong">Add a test</div><div class="small muted">Any practice test or source that isn't listed</div></div></button>
+        </div>
         <div class="card stack">
           <h3>Legacy practice tests</h3>
           <p class="small muted">Free pre-2025 tests. Add a name or link and the planner will assign their sections at enhanced pacing.</p>
@@ -304,6 +316,18 @@ function bind(el) {
       const next = Math.max(0, Math.min(300, cur + dir * STEP));
       return save({ availability: { ...s.availability, [d]: next } });
     }
+    const et = e.target.closest('[data-edit-test]');
+    if (et) {
+      const entry = (s.customMaterials || []).find((c) => c.sourceId === et.dataset.editTest);
+      if (entry && (await addTestSheet(entry))) toast('Saved.');
+      return;
+    }
+    const rt2 = e.target.closest('[data-remove-test]');
+    if (rt2) {
+      await removeTest(rt2.dataset.removeTest);
+      toast('Removed.');
+      return;
+    }
     const th = e.target.closest('[data-theme-pick]');
     if (th) {
       setTheme(th.dataset.themePick);
@@ -375,6 +399,11 @@ function bind(el) {
     }
     if (a === 'remove-full') return save({ fullTests: (s.fullTests || []).filter((f) => f.date !== b.dataset.date) });
     if (a === 'export') return doExport();
+    if (a === 'add-test-material') {
+      const entry = await addTestSheet();
+      if (entry) toast(`${entry.title} added.`);
+      return;
+    }
     if (a === 'sync-now') {
       b.disabled = true;
       b.textContent = 'Syncing';
