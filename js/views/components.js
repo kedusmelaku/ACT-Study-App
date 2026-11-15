@@ -30,7 +30,11 @@ function taskLink(t) {
   return html`<a class="task-link" href="${url}" target="_blank" rel="noopener">Open ${m.short || m.title}</a>`;
 }
 
+// Task cards whose details are open. Kept here so a redraw (after a sync, for example) doesn't close them.
+const openDetails = new Set();
+
 export function taskCard(t, { showActions = true, collapsed = false } = {}) {
+  const open = collapsed && openDetails.has(t.id);
   const done = t.status === 'done';
   const statusBadge =
     t.status === 'skipped'
@@ -55,7 +59,7 @@ export function taskCard(t, { showActions = true, collapsed = false } = {}) {
         ${t.section ? html`<span class="badge">${TYPE_LABEL[t.type] || 'Task'}</span>` : ''}
         ${cause}${statusBadge}
       </div>
-      <div class="task-more" ${collapsed ? html`hidden` : ''}>
+      <div class="task-more" ${collapsed && !open ? html`hidden` : ''}>
         <p class="task-detail">${t.detail}</p>
         <div class="row mt">${t.lessonRef ? html`<a class="btn btn-sm btn-secondary" href="${lessonHref(t.lessonRef.section, t.lessonRef.topic)}">${icon('book')}Open lesson</a>` : ''}${taskLink(t)}</div>
       </div>
@@ -70,9 +74,9 @@ export function taskCard(t, { showActions = true, collapsed = false } = {}) {
         ? html`<button class="btn btn-sm btn-secondary reschedule-cta" data-action="reschedule" data-id="${t.id}">${icon('plan')}Reschedule to another day</button>`
         : ''}
       ${showActions && collapsed && t.status === 'todo'
-        ? html`<div class="task-more-actions" hidden><button class="btn btn-ghost btn-sm reschedule-btn" data-action="reschedule" data-id="${t.id}">${icon('plan')}Reschedule</button></div>`
+        ? html`<div class="task-more-actions" ${open ? '' : html`hidden`}><button class="btn btn-ghost btn-sm reschedule-btn" data-action="reschedule" data-id="${t.id}">${icon('plan')}Reschedule</button></div>`
         : ''}
-      ${collapsed ? html`<button class="btn btn-ghost btn-sm expand-btn" data-action="expand" data-id="${t.id}" aria-expanded="false">Details</button>` : ''}
+      ${collapsed ? html`<button class="btn btn-ghost btn-sm expand-btn" data-action="expand" data-id="${t.id}" aria-expanded="${open}">${open ? 'Hide details' : 'Details'}</button>` : ''}
     </div>
   </article>`;
 }
@@ -103,6 +107,8 @@ export function bindTaskActions(root) {
         if (extra) extra.hidden = !extra.hidden;
         if (d) {
           d.hidden = !d.hidden;
+          if (d.hidden) openDetails.delete(id);
+          else openDetails.add(id);
           b.textContent = d.hidden ? 'Details' : 'Hide details';
           b.setAttribute('aria-expanded', String(!d.hidden));
         }
