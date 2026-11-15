@@ -286,6 +286,7 @@ export function render(el, ctx) {
     if (b.dataset.topic !== undefined && b.closest('[data-tag-card]')) {
       currentTag().topic = b.dataset.topic;
       el.querySelectorAll('[data-topic]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      refreshChip(el);
       saveDraft();
       return;
     }
@@ -306,8 +307,7 @@ export function render(el, ctx) {
     if (b.dataset.cause) {
       currentTag().cause = b.dataset.cause;
       el.querySelectorAll('[data-cause]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-      const chip = el.querySelector(`[data-tag-go="${draft.tagIndex}"]`);
-      if (chip) chip.classList.add('done');
+      refreshChip(el);
       saveDraft();
       return;
     }
@@ -787,19 +787,41 @@ async function fillReview(el) {
   setHTML(box, reviewInner(key, hintFor(s, q), draft.tags[key] || {}, k));
 }
 
-/** Every marked question in a scrollable row: section color and letter, tagged, not scored, current. */
+/**
+ * How much of a question's tagging is done, 0 to 1. The cause is what's left to pick when the topic
+ * comes from the key; otherwise topic and cause are each half.
+ */
+function tagProgress(key) {
+  const [s, q] = key.split(':');
+  const t = draft.tags[key] || {};
+  const k = keyed() ? keyFor(draft.sourceId, s, q) : null;
+  if (k && k.topic) return t.cause ? 1 : 0;
+  return ((t.topic ? 1 : 0) + (t.cause ? 1 : 0)) / 2;
+}
+
+/** Every marked question in a scrollable row. Each chip fills with its section's color as it's tagged. */
 function tagStrip(keys, current) {
   if (keys.length < 2) return '';
   return html`<div class="tag-strip" role="list" aria-label="Missed questions">
     ${keys.map((key, j) => {
       const [s, q] = key.split(':');
       const k = keyed() ? keyFor(draft.sourceId, s, q) : null;
-      const done = Boolean((draft.tags[key] || {}).cause);
       const uns = Boolean(k && k.unscored);
-      const label = `${SECTIONS[s].label} question ${q}${uns ? ', not scored' : ''}${done ? ', tagged' : ''}`;
-      return html`<button type="button" role="listitem" class="ts sec-${s}${done ? ' done' : ''}${uns ? ' uns' : ''}" data-tag-go="${j}" aria-current="${j === current}" aria-label="${label}"><span class="ts-sec">${SECTIONS[s].short}</span>${q}</button>`;
+      const fill = tagProgress(key);
+      const newSection = j > 0 && keys[j - 1].split(':')[0] !== s;
+      const label = `${SECTIONS[s].label} question ${q}${uns ? ', not scored' : ''}${fill === 1 ? ', tagged' : ''}`;
+      return html`<button type="button" role="listitem" class="ts sec-${s}${uns ? ' uns' : ''}${fill === 1 ? ' full' : ''}${newSection ? ' gap' : ''}" style="--fill:${Math.round(fill * 100)}%" data-tag-go="${j}" aria-current="${j === current}" aria-label="${label}">${q}</button>`;
     })}
   </div>`;
+}
+
+/** Update the current question's chip after a topic or cause is picked. */
+function refreshChip(el) {
+  const chip = el.querySelector(`[data-tag-go="${draft.tagIndex}"]`);
+  if (!chip) return;
+  const fill = tagProgress(markedKeys()[draft.tagIndex]);
+  chip.style.setProperty('--fill', `${Math.round(fill * 100)}%`);
+  chip.classList.toggle('full', fill === 1);
 }
 
 /** Scroll the strip so the current question is in view, without moving the page. */
