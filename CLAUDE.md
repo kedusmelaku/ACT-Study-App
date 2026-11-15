@@ -207,7 +207,7 @@ The planner should prefer resources whose sections haven't been used yet. Hold t
 - **Current estimate** per section: a weighted average of the 3 most recent attempts that include that section.
   - Weight by recency: 1.0, 0.7, 0.5 (most recent first).
   - Weight by kind: `real` 1.0, `official_enhanced` 1.0, `official_legacy` 0.8, `benchmark` 0.6, `other` 0.5.
-  - Convert scores on a 35-point scale to 36 by keeping the number as-is but flagging it as capped at 35.
+  - Convert scores on a 35-point scale to the 36 scale (score × 36/35) before averaging, so a bigger scale never reads as a gain. Show the original score out of 35 wherever the attempt itself is shown.
   - The estimated composite uses the rounding rule on the estimates.
 
 ### 9.5 Focus engine (`logic/focus.js`)

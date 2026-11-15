@@ -59,15 +59,19 @@ test('estimate weights recency (1, 0.7, 0.5) and kind', () => {
     attempt('other', '2026-10-01', 'other', { english: 30, math: 30, reading: 30 }),
   ];
   const m = estimates(mixed);
-  const exp2 = (35 * 1 * 0.6 + 30 * 0.7 * 0.5) / (0.6 + 0.35);
+  // 35-scale scores are converted to the 36 scale (35/35 counts as 36) and the estimate is flagged.
+  const exp2 = (36 * 1 * 0.6 + 30 * 0.7 * 0.5) / (0.6 + 0.35);
   assert.ok(Math.abs(m.english.value - exp2) < 1e-9);
-  assert.equal(m.english.capped, true, '35-scale scores are flagged as capped');
+  assert.equal(m.english.capped, true);
   assert.equal(m.science, null);
 });
 
 test('estimated composite uses the rounding rule', () => {
+  // On the 36 scale: 36, 36, 33.94 -> sections round to 36, 36, 34 -> composite 35.33 -> 35.
   const e = estimates([attempt('b', '2026-11-01', 'benchmark', { english: 35, math: 35, reading: 33 }, 35)]);
-  assert.equal(estimatedComposite(e), 34);
+  assert.equal(estimatedComposite(e), 35);
+  const p = estimates([attempt('p', '2026-11-01', 'official_enhanced', { english: 35, math: 35, reading: 33 })]);
+  assert.equal(estimatedComposite(p), 34);
 });
 
 test('a duplicated benchmark (one per device) counts once', () => {

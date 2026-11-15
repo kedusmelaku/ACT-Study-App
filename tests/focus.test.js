@@ -6,7 +6,7 @@ import { attempt, miss } from './helpers.js';
 const today = '2026-11-07';
 
 test('E35 M35 R33: Reading needs 1 point and is the top priority', () => {
-  const f = computeFocus({ attempts: [attempt('b', '2026-10-01', 'benchmark', { english: 35, math: 35, reading: 33 }, 35)], today });
+  const f = computeFocus({ attempts: [attempt('b', '2026-10-01', 'official_enhanced', { english: 35, math: 35, reading: 33 })], today });
   assert.equal(f.bySection.reading.pointsNeeded, 1);
   assert.equal(f.top, 'reading');
   assert.equal(f.ranked[0].section, 'reading');
@@ -100,4 +100,13 @@ test('a miss with several topics splits its weight between them', () => {
   assert.equal(w.Commas, 0.5);
   assert.equal(w.Transitions, 0.5);
   assert.equal(f.bySection.english.weakness, 1);
+});
+
+test('a benchmark out of 35 is converted before the focus math', () => {
+  // E35 M35 R33 out of 35 is about E36 M36 R34 out of 36: composite 35, Reading still 1 point away.
+  const f = computeFocus({ attempts: [attempt('b', '2026-10-01', 'benchmark', { english: 35, math: 35, reading: 33 }, 35)], today });
+  assert.equal(f.top, 'reading');
+  assert.equal(f.bySection.reading.pointsNeeded, 1);
+  assert.equal(f.bySection.english.leverage, 0);
+  assert.match(f.sentence, /from 35 to 36/);
 });

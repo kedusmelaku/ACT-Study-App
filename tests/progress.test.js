@@ -12,7 +12,7 @@ const attempts = [
 test('trend series is in date order with a running estimated composite', () => {
   const s = trendSeries([attempts[2], attempts[0], attempts[1]]);
   assert.deepEqual(s.map((p) => p.id), ['b', 'p1', 'r1']);
-  assert.equal(s[0].estComposite, 34);
+  assert.equal(s[0].estComposite, 35); // benchmark converted to the 36 scale
   assert.equal(s[2].real, true);
   assert.equal(s[1].composite, 33);
 });

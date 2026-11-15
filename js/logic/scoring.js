@@ -75,9 +75,17 @@ export function dedupeAttempts(attempts = []) {
     });
 }
 
+/** A score on the 36-point scale: scores out of 35 are stretched (x 36/35). */
+export function on36Value(score, scale) {
+  const v = Number(score);
+  return Number(scale) === 35 ? Math.min(MAX_SCORE, (v * MAX_SCORE) / 35) : v;
+}
+
 /**
  * Current estimate per section: weighted average of the 3 most recent attempts with that section.
- * Weights: recency (1.0, 0.7, 0.5) times kind weight. 35-scale scores stay as-is but are flagged capped.
+ * Weights: recency (1.0, 0.7, 0.5) times kind weight. Scores out of 35 are converted to the 36 scale
+ * first (on36Value), so a test on a bigger scale doesn't look like a gain. `capped` marks an estimate
+ * that includes a converted score.
  * Returns { english: { value, score, capped, count, attemptIds } | null, ... }
  */
 export function estimates(attempts = []) {
@@ -99,7 +107,7 @@ export function estimates(attempts = []) {
     used.forEach((a, i) => {
       const kw = (ATTEMPT_KINDS[a.kind] || ATTEMPT_KINDS.other).weight;
       const w = RECENCY_WEIGHTS[i] * kw;
-      num += a.scores[s] * w;
+      num += on36Value(a.scores[s], a.scale) * w;
       den += w;
       if (Number(a.scale) === 35) capped = true;
     });

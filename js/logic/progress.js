@@ -1,6 +1,6 @@
 // Progress data: trend series, topic trends, and the aggregated stats sent to the weekly coach. Pure.
 import { ALL_SECTIONS, CORE_SECTIONS, CAUSE_KEYS, CAUSES, FOCUS } from '../data/act.js';
-import { estimates, estimatedComposite, compositeOf, dedupeAttempts } from './scoring.js';
+import { estimates, estimatedComposite, compositeOf, dedupeAttempts, on36Value } from './scoring.js';
 import { computeFocus, missDate } from './focus.js';
 import { addDays, compareDates, daysBetween, ageInDays, dateOf } from './dates.js';
 import { redoStats } from './redo.js';
@@ -25,7 +25,7 @@ export function trendSeries(attempts) {
       scores: { ...a.scores },
       // Where to draw each score on the chart: scores out of 35 are placed at their 36-scale
       // equivalent (score x 36/35), so a change of scale doesn't look like a change in score.
-      plot: Object.fromEntries(Object.entries(a.scores).filter(([, v]) => Number.isFinite(v)).map(([s, v]) => [s, Number(a.scale) === 35 ? (v * 36) / 35 : v])),
+      plot: Object.fromEntries(Object.entries(a.scores).filter(([, v]) => Number.isFinite(v)).map(([s, v]) => [s, on36Value(v, a.scale)])),
       composite: compositeOf(a.scores),
       estComposite: estimatedComposite(estimates(upTo)),
     };
@@ -81,7 +81,7 @@ export function coachStats({ settings, attempts, misses, redos, pacing, tasks, t
     const info = focus.bySection[s];
     sections[s] = {
       estimate: info.estimate ? info.estimate.score : null,
-      cappedAt35: info.estimate ? info.estimate.capped : false,
+      convertedFrom35: info.estimate ? info.estimate.capped : false,
       pointsToRaiseComposite: CORE_SECTIONS.includes(s) && Number.isFinite(info.pointsNeeded) ? info.pointsNeeded : null,
       leverage: round2(info.leverage),
       weakness: round2(info.weakness),
