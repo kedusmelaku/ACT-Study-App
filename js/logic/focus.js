@@ -197,6 +197,7 @@ const CAUSE_PHRASE = {
   careless: 'careless slips',
   time: 'running short on time',
   trap: 'trap answers',
+  misread: 'misreading the question',
 };
 
 /** One plain sentence explaining the focus, built from the engine's numbers. */

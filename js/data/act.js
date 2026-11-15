@@ -54,8 +54,10 @@ export const CAUSES = Object.freeze({
   careless: Object.freeze({ label: 'Careless', short: 'Careless', mult: 0.8 }),
   time: Object.freeze({ label: 'Ran out of time', short: 'Time', mult: 0.8 }),
   trap: Object.freeze({ label: 'Fell for a trap', short: 'Trap', mult: 1.0 }),
+  // Answered a different question than the one asked (missed NOT, EXCEPT, a line range, units).
+  misread: Object.freeze({ label: 'Misread the question', short: 'Misread', mult: 0.8 }),
 });
-export const CAUSE_KEYS = Object.freeze(['content', 'careless', 'time', 'trap']);
+export const CAUSE_KEYS = Object.freeze(['content', 'careless', 'time', 'trap', 'misread']);
 /** Questions answered right only by guessing count at this weight. */
 export const GUESSED_RIGHT_MULT = 0.5;
 // Misses on unscored (field-test) questions, known from official practice-test keys.

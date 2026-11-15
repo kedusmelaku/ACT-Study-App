@@ -362,6 +362,7 @@ svg:not([width]) { width: 20px; height: 20px; flex: none; }
 .chip-lg { min-height: 64px; padding: 10px 14px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; }
 .chip-lg small { font-weight: 500; opacity: 0.75; font-size: 0.78rem; }
 .cause-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cause-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 
 .seg { display: flex; background: var(--surface-2); padding: 4px; border-radius: 12px; gap: 4px; overflow-x: auto; scrollbar-width: none; }
 .seg::-webkit-scrollbar { display: none; }
@@ -522,6 +523,7 @@ textarea.input { min-height: 88px; resize: vertical; line-height: 1.4; }
 .cause-careless { background: var(--english); }
 .cause-time { background: var(--warn); }
 .cause-trap { background: var(--danger); }
+.cause-misread { background: var(--science); }
 .cause-key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: 0; }
 
 .chart { width: 100%; height: auto; overflow: visible; }

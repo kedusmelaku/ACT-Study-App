@@ -88,3 +88,7 @@ test('focus sentence from misses also says how many points move the composite', 
   assert.equal(f.top, 'reading');
   assert.match(f.sentence, /^Reading is your focus: most of your weighted misses are there, led by inference, mostly from trap answers\. Two more Reading points move your composite from 33 to 34\.$/);
 });
+
+test('a misread miss counts like a careless one', () => {
+  assert.equal(missWeight(miss('english', 'Commas', 'misread', today), null, today), 0.8);
+});

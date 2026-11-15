@@ -113,7 +113,7 @@ README.md
   - `{ attemptId, section, notReached, guessedAtEnd, minutesLeft }`
 - **misses:** the error log.
   - `{ id, attemptId?, sourceId, section, questionNumber?, topic, cause, myAnswer?, correctAnswer?, note, fixLine, guessedRight: bool, createdAt }`
-  - `cause` is one of: `content` (didn't know), `careless`, `time` (ran out), `trap` (picked a plausible but unsupported answer).
+  - `cause` is one of: `content` (didn't know), `careless`, `time` (ran out), `trap` (picked a plausible but unsupported answer), `misread` (didn't read what the question asked carefully).
   - Set `guessedRight: true` for questions he got right only by guessing. They count as weak spots at half weight.
 - **redos:** `{ missId, dueDate, interval, streak, history: [{ date, result: "right" | "wrong" }], status: "active" | "retired" | "persistent" }`
 - **tasks:** generated plan items.

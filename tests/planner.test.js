@@ -253,3 +253,13 @@ test('a full-test day done with a different test asks for no "log" task once tha
   const later = plan({ weekStart: '2026-11-21', today: '2026-11-21', s: { ...s, fullTests: [{ date: '2026-11-25', sourceId: 'enhanced-2' }] }, attempts: [bench, pt3] });
   assert.equal(later.tasks.find((t) => t.type === 'full_test').materialRef.sourceId, 'enhanced-2');
 });
+
+test('misread misses lead to a read-the-question drill', () => {
+  const misses = [miss('reading', 'Detail', 'misread', '2026-11-13'), miss('reading', 'Inference', 'misread', '2026-11-12')];
+  const focus = computeFocus({ attempts: [bench], misses, today: '2026-11-14' });
+  assert.equal(focus.bySection.reading.dominantCause, 'misread');
+  const drills = plan({ weekStart: '2026-11-14', today: '2026-11-14', misses }).tasks.filter((t) => t.type === 'drill' && t.section === 'reading');
+  assert.ok(drills.length > 0);
+  assert.match(drills[0].title, /read-the-question/);
+  assert.match(drills[0].detail, /NOT, EXCEPT/);
+});

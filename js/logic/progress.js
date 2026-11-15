@@ -55,7 +55,7 @@ export function topicTrends({ attempts, misses, redos, pacing, today }, limit = 
 
 export function causeSplit(misses, today, days = FOCUS.dominantCauseWindowDays) {
   const out = {};
-  for (const s of ALL_SECTIONS) out[s] = { total: 0, content: 0, careless: 0, time: 0, trap: 0 };
+  for (const s of ALL_SECTIONS) out[s] = { total: 0, ...Object.fromEntries(CAUSE_KEYS.map((c) => [c, 0])) };
   for (const m of misses) {
     if (!out[m.section] || ageInDays(missDate(m), today) > days) continue;
     const c = CAUSES[m.cause] ? m.cause : 'content';

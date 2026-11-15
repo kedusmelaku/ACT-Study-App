@@ -336,6 +336,17 @@ function drillTask(section, cause, topic, ledger, minutes) {
         materialRef: ref,
         minutes,
       };
+    case 'misread':
+      return {
+        section,
+        type: 'drill',
+        cause,
+        topic,
+        title: `${label} read-the-question set`,
+        detail: `Do ${where}, ${span}. Before looking at the choices, underline exactly what each question asks: words like NOT, EXCEPT, LEAST, BEST, the line or paragraph it points to, and the units. Reread that part once more before you bubble.${topicBit}`,
+        materialRef: ref,
+        minutes,
+      };
     case 'time':
       return {
         section,

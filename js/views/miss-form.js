@@ -13,6 +13,7 @@ const CAUSE_HELP = {
   careless: 'Knew it, slipped',
   time: 'Rushed, or never reached it',
   trap: 'Picked a plausible but unsupported answer',
+  misread: "Didn't read what it asked carefully",
 };
 
 /** Topic chips. `likely` topics (from an answer key's category) are listed first, set apart. */

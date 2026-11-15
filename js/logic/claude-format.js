@@ -2,10 +2,10 @@
 // (copy-to-chat mode) and the /api routes (built-in mode), so both ask Claude the same thing.
 
 export const SECTION_KEYS = ['english', 'math', 'reading', 'science'];
-export const CAUSE_KEYS = ['content', 'careless', 'time', 'trap'];
+export const CAUSE_KEYS = ['content', 'careless', 'time', 'trap', 'misread'];
 
 const EXPLAIN_SHAPE =
-  '{"explanation": string (at most 120 words), "rule": string (one sentence), "trap": string or null, "fixLine": string (one line, at most 20 words), "suggestedTopic": string (a short ACT topic name), "suggestedCause": one of "content", "careless", "time", "trap"}';
+  '{"explanation": string (at most 120 words), "rule": string (one sentence), "trap": string or null, "fixLine": string (one line, at most 20 words), "suggestedTopic": string (a short ACT topic name), "suggestedCause": one of "content", "careless", "time", "trap", "misread" (misread means the student answered a different question than the one asked)}';
 
 /** Who the student is, from their own estimated composite (no fixed level baked in). */
 export function studentLine(level) {
