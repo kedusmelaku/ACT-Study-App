@@ -1,7 +1,7 @@
 // App state: loads everything from IndexedDB into memory, runs actions, and keeps the plan current.
 import * as db from './db.js';
 import { defaultSettings } from './data/calendar.js';
-import { buildMaterials, duplicatesBuiltIn } from './data/materials.js';
+import { buildMaterials, builtInFor } from './data/materials.js';
 import { keyFor } from './data/forms.js';
 import { ALL_SECTIONS, CORE_SECTIONS } from './data/act.js';
 import { computeFocus } from './logic/focus.js';
@@ -161,19 +161,51 @@ export async function init() {
 }
 
 /**
- * Official Practice Tests 1 to 4 are built in now. A copy the user added by hand before that
- * is removed, as long as nothing was logged or planned with it.
+ * Official Practice Tests 1 to 4 are built in now. A copy the user added by hand before that is
+ * merged into the built-in one: attempts, misses, plan tasks, material use, and full-test days that
+ * pointed at the copy point at the built-in test instead, then the copy is removed.
  */
 async function dropDuplicateTests() {
   const list = state.settings.customMaterials || [];
-  const used = (id) =>
-    state.attempts.some((a) => a.sourceId === id) ||
-    state.misses.some((m) => m.sourceId === id) ||
-    state.materialUse.some((u) => u.sourceId === id) ||
-    (state.settings.fullTests || []).some((f) => f.sourceId === id) ||
-    state.tasks.some((t) => t.status !== 'todo' && t.materialRef && t.materialRef.sourceId === id);
-  const keep = list.filter((c) => !(duplicatesBuiltIn(c) && !used(c.sourceId)));
-  if (keep.length !== list.length) await saveSettings({ customMaterials: keep });
+  const swap = new Map(list.filter((c) => builtInFor(c)).map((c) => [c.sourceId, builtInFor(c)]));
+  if (!swap.size) return;
+  const ops = [];
+  const fix = (name, rows, change) => {
+    state[name] = rows.map((r) => {
+      const next = change(r);
+      if (next === r) return r;
+      ops.push({ store: name, type: 'put', value: next });
+      return next;
+    });
+  };
+  fix('attempts', state.attempts, (a) => (swap.has(a.sourceId) ? { ...a, sourceId: swap.get(a.sourceId) } : a));
+  fix('misses', state.misses, (m) => {
+    if (!swap.has(m.sourceId)) return m;
+    const next = { ...m, sourceId: swap.get(m.sourceId) };
+    return { ...next, unscored: isUnscored(next) };
+  });
+  fix('tasks', state.tasks, (t) =>
+    t.materialRef && swap.has(t.materialRef.sourceId) ? { ...t, materialRef: { ...t.materialRef, sourceId: swap.get(t.materialRef.sourceId) } } : t,
+  );
+  // Material-use ids include the sourceId, so those records get new ids.
+  const use = [];
+  for (const u of state.materialUse) {
+    if (!swap.has(u.sourceId)) {
+      use.push(u);
+      continue;
+    }
+    const sid = swap.get(u.sourceId);
+    const next = { ...u, sourceId: sid, id: String(u.id).split(u.sourceId).join(sid) };
+    ops.push({ store: 'materialUse', type: 'delete', key: u.id });
+    if (!use.some((x) => x.id === next.id)) {
+      ops.push({ store: 'materialUse', type: 'put', value: next });
+      use.push(next);
+    }
+  }
+  state.materialUse = use;
+  if (ops.length) await db.batch(ops);
+  const fullTests = (state.settings.fullTests || []).map((f) => (swap.has(f.sourceId) ? { ...f, sourceId: swap.get(f.sourceId) } : f));
+  await saveSettings({ customMaterials: list.filter((c) => !swap.has(c.sourceId)), fullTests });
 }
 
 async function reloadFromDB() {

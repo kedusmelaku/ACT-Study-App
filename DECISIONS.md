@@ -159,7 +159,7 @@ Judgment calls made without asking. One line each: what, then why.
 - Added tests can be renamed or relinked any time, and removed only while no attempt uses them.
 - Official Practice Tests 1 to 4 have built-in scoring keys (js/data/forms.js), read from the four official scoring-key PDFs and spot-checked against rendered key pages. Logging one goes Source, Misses, Tag: scores come from scored questions minus scored misses, through each test's own conversion table.
 - The uploaded keys are treated as the real ones. All four tests are titled "Official Practice Test 1" to "4" and link to the ACT test prep hub; the old PDF links were dropped since they may be different forms.
-- A hand-added "Practice Test 1 to 4" entry is removed on load if no attempt, miss, full-test day, or finished task uses it, since those tests are built in now.
+- A hand-added copy of Practice Test 1 to 4 (matched by name) is merged into the built-in test on load: attempts, misses, plan tasks, material use, and full-test days move over to it, then the copy is removed.
 - Misses on unscored questions still get redos and stay in the log, but count at half weight in the focus engine. When a miss is both unscored and guessed right, the smaller multiplier is used, not the product.
 - Whether a miss is unscored comes from the key whenever its test and question number are known, so edits and quick-add misses stay correct.
 - Each section of a keyed test has an "I took this section" toggle, all on by default (Science too, since full tests include it).

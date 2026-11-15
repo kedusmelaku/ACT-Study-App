@@ -165,10 +165,15 @@ export function attemptSources(materials) {
 }
 
 /**
- * True when a test the user added is one of the built-in Official Practice Tests 1 to 4 under another
- * name (added before those were built in). Callers remove it only when nothing refers to it.
+ * When a test the user added is one of the built-in Official Practice Tests 1 to 4 under another
+ * name (added before those were built in), the built-in sourceId it stands for. Otherwise null.
  */
-export function duplicatesBuiltIn(custom) {
+export function builtInFor(custom) {
   const t = String((custom && custom.title) || '').trim().toLowerCase().replace(/\s+/g, ' ');
-  return /^(the )?(official )?(act )?(enhanced )?(online )?practice test #?[1-4]$/.test(t);
+  const m = /^(the )?(official )?(act )?(enhanced )?(online )?practice test #?([1-4])$/.exec(t);
+  return m ? `enhanced-${m[6]}` : null;
+}
+
+export function duplicatesBuiltIn(custom) {
+  return builtInFor(custom) !== null;
 }
