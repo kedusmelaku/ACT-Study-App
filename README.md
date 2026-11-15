@@ -110,6 +110,7 @@ Full-test days, taper week (review only from Monday, no study Thursday and Frida
 
 - Your data stays on your device unless you export it. The passcode is never included in exports.
 - Photos sent to Explain are resized on the phone, sent once, and never stored. Only Claude's text reply is saved, on the miss.
+- Import results reads the results PDF or pasted text on the device. Question wording from it is shown while you tag and then dropped. It's never saved, exported, or synced.
 - Coach receives aggregated numbers only (estimates, topic weights, cause counts, redo and completion stats), never question text or photos.
 
 ## Project layout
@@ -128,5 +129,6 @@ api/_claude.js       Anthropic Messages API call
 api/_redis.js        Upstash Redis REST client
 api/explain.js, api/coach.js, api/sync.js
 js/sync.js           background sync on the device
+vendor/pdfjs/        pdf.js 5.4.296 (Mozilla, Apache-2.0), reads results PDFs offline
 tests/*.test.js
 ```

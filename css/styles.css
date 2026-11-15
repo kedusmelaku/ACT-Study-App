@@ -705,3 +705,10 @@ summary { cursor: pointer; min-height: 32px; display: list-item; }
 .sync-code { font-family: var(--mono); font-size: 1.05rem; letter-spacing: 0.04em; background: var(--surface-2); padding: 10px 12px; border-radius: 10px; white-space: nowrap; display: block; text-align: center; }
 .sync-code.is-masked { font-family: var(--font); letter-spacing: 0; color: var(--muted); }
 .sync-code-input { font-family: var(--mono); letter-spacing: 0.08em; text-transform: uppercase; }
+
+/* ---------- results import ---------- */
+.file-btn { position: relative; overflow: hidden; }
+.file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.q-hint { border-left: 3px solid var(--border); padding: 4px 0 4px 12px; display: grid; gap: 4px; }
+.q-hint p { margin: 0; }
+.q-hint-text { font-size: 0.95rem; }

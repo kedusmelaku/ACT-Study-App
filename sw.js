@@ -1,5 +1,5 @@
 // Service worker: offline app shell. Bump CACHE_VERSION whenever a static file changes.
-const CACHE_VERSION = 'v21';
+const CACHE_VERSION = 'v22';
 const CACHE_NAME = `act-prep-${CACHE_VERSION}`;
 
 const ASSETS = [
@@ -22,6 +22,10 @@ const ASSETS = [
   '/js/data/calendar.js',
   '/js/data/materials.js',
   '/js/data/forms.js',
+  '/js/logic/results-import.js',
+  '/js/views/import-results.js',
+  '/vendor/pdfjs/pdf.min.js',
+  '/vendor/pdfjs/pdf.worker.min.js',
   '/js/data/topics.js',
   '/js/logic/claude-format.js',
   '/js/logic/dates.js',

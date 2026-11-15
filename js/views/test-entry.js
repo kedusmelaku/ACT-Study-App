@@ -11,6 +11,8 @@ import { isTimingFlag } from '../logic/focus.js';
 import { isISODate } from '../logic/dates.js';
 import { topicPicker, causePicker, promptNewTopic } from './miss-form.js';
 import { addTestSheet } from './add-test.js';
+import { importResultsSheet } from './import-results.js';
+import { parseResults, splitSections, checkResults } from '../logic/results-import.js';
 
 export const live = false;
 
@@ -18,6 +20,22 @@ const DRAFT_KEY = 'act-prep-test-draft';
 const STEP_LABELS = { source: 'Source', scores: 'Scores', misses: 'Misses', tag: 'Tag' };
 
 let draft = null;
+
+// First line and answer of each imported question, for the tag card. Official question text, so it
+// lives in memory only: never in the draft, the saved miss, exports, or sync.
+let hints = { sourceId: null, bySection: {} };
+let importNotice = '';
+
+function hintFor(section, q) {
+  if (hints.sourceId !== draft.sourceId) return null;
+  const list = hints.bySection[section];
+  return (list && list[Number(q) - 1]) || null;
+}
+
+function forgetImport() {
+  hints = { sourceId: null, bySection: {} };
+  importNotice = '';
+}
 
 function blankDraft(query) {
   const mats = attemptSources(store.materials());
@@ -105,6 +123,15 @@ function clearDraft() {
   } catch {
     /* ignore */
   }
+}
+
+/** The practice-test number of the test picked in step 1, when it has one. */
+function chosenTestNumber() {
+  const m = /^enhanced-(\d+)$/.exec(draft.sourceId || '');
+  if (m) return Number(m[1]);
+  const mat = store.materials().find((x) => x.sourceId === draft.sourceId);
+  const t = mat && /practice test\s*#?(\d+)/i.exec(mat.title || '');
+  return t ? Number(t[1]) : null;
 }
 
 function questionCount(section) {
@@ -266,6 +293,7 @@ export function render(el, ctx) {
     if (action === 'tag-next') return tagMove(1);
     if (action === 'tag-prev') return tagMove(-1);
     if (action === 'save') return save();
+    if (action === 'import') return importResults();
     if (action === 'edit-scores') {
       // Start from the key's scores; the edited ones stick until "Use key scores".
       const r = keyResult();
@@ -284,6 +312,7 @@ export function render(el, ctx) {
       if (!ok) return;
       clearDraft();
       draft = null;
+      forgetImport();
       ctx.navigate('#/tests');
     }
   });
@@ -334,6 +363,7 @@ export function render(el, ctx) {
   bindGrid(el);
 
   function next() {
+    importNotice = '';
     const err = validateStep(el);
     if (err) {
       const box = el.querySelector('[data-error]');
@@ -354,7 +384,66 @@ export function render(el, ctx) {
     draw();
     window.scrollTo(0, 0);
   }
+  async function importResults() {
+    readPacing(el);
+    let text;
+    try {
+      text = await importResultsSheet();
+    } catch (err) {
+      reportError(err, "Couldn't read that file. Try another one, or paste the results page.");
+      return;
+    }
+    if (!text) return;
+    importNotice = '';
+    const done = [];
+    for (const chunk of splitSections(text)) {
+      const p = parseResults(chunk);
+      const msg = await applyImport(p);
+      if (msg) {
+        importNotice = msg;
+        break;
+      }
+      done.push(p);
+    }
+    draw();
+    if (done.length) {
+      const n = done.reduce((t, p) => t + p.results.filter((r) => r === 'incorrect').length, 0);
+      toast(`Marked ${plural(n, 'miss', 'misses')} in ${done.map((p) => SECTIONS[p.section].label).join(' and ')}.`);
+    }
+  }
+
+  /** Mark one parsed section's misses. Returns a message instead when it can't be imported. */
+  async function applyImport(p) {
+    if (!p.section) return checkResults(p, 0);
+    const sec = p.section;
+    const label = SECTIONS[sec].label;
+    if (!keyed() && !enteredSections().includes(sec)) return `Add a ${label} score first, then import.`;
+    const msg = checkResults(p, questionCount(sec));
+    if (msg) return msg;
+    const picked = chosenTestNumber();
+    if (p.testNumber && picked && p.testNumber !== picked) {
+      const ok = await confirmSheet({
+        title: 'Different test?',
+        body: `This file is from Practice Test ${p.testNumber}, but you picked Practice Test ${picked}. Import it anyway?`,
+        confirmLabel: 'Import anyway',
+      });
+      if (!ok) return '';
+    }
+    const marks = draft.marks[sec];
+    p.results.forEach((r, i) => {
+      const q = i + 1;
+      if (r === 'incorrect') marks[q] = 'miss';
+      else if (marks[q] === 'miss') delete marks[q];
+    });
+    if (draft.taken) draft.taken = { ...draft.taken, [sec]: true };
+    draft.activeSection = sec;
+    if (hints.sourceId !== draft.sourceId) hints = { sourceId: draft.sourceId, bySection: {} };
+    hints.bySection[sec] = p.questions;
+    return null;
+  }
+
   function back() {
+    importNotice = '';
     if (stepId() === 'misses') readPacing(el);
     if (stepId() === 'tag') readTagText(el);
     draft.step = Math.max(0, draft.step - 1);
@@ -379,6 +468,7 @@ export function render(el, ctx) {
       const id = await persist();
       clearDraft();
       draft = null;
+      forgetImport();
       toast('Test saved. Your plan just updated.');
       ctx.navigate(`#/tests/${id}`);
     } catch (err) {
@@ -529,6 +619,8 @@ function stepMisses() {
     <div class="stepper"><button type="button" data-step-pacing="${s}:${field}:-1" aria-label="Less">-</button><output data-pacing-out="${s}:${field}">${p[field] || 0}</output><button type="button" data-step-pacing="${s}:${field}:1" aria-label="More">+</button></div></div>`;
   return html`<div class="stack-lg">
     ${isKeyed ? html`<div class="card stack-sm" data-key-summary>${keySummary()}</div>` : ''}
+    <button type="button" class="btn btn-secondary btn-block" data-action="import">${icon('upload')}Import results</button>
+    ${importNotice ? html`<p class="notice notice-warn">${importNotice}</p>` : ''}
     <div class="seg" role="tablist">
       ${secs.map((x) => {
         const c = Object.keys(draft.marks[x]).length;
@@ -624,6 +716,7 @@ function stepTag() {
   const guessed = draft.marks[s][q] === 'guess';
   const isLast = i === keys.length - 1;
   const k = keyed() ? keyFor(draft.sourceId, s, q) : null;
+  const hint = hintFor(s, q);
   const likely = k && k.category ? (CATEGORY_TOPICS[s] || {})[k.category] || [] : [];
   const sub = [`${i + 1} of ${keys.length}`];
   if (guessed) sub.push('Guessed right, counts at half weight');
@@ -634,6 +727,9 @@ function stepTag() {
       <div class="grow"><div class="strong">${SECTIONS[s].label}, question ${q}</div><div class="small muted">${sub.join('. ')}</div></div>
       ${k ? html`<div class="key-tags">${k.unscored ? html`<span class="badge badge-muted">Not scored</span>` : ''}<span class="badge">Key: ${k.answer}</span></div>` : ''}
     </div>
+    ${hint && (hint.text || hint.answer)
+      ? html`<div class="q-hint">${hint.text ? html`<p class="q-hint-text">${hint.text}</p>` : ''}${hint.answer ? html`<p class="small muted">Your answer: ${hint.answer}</p>` : ''}</div>`
+      : ''}
     <div class="field"><span class="label">Topic${k && k.category ? html` <span class="hint">Key category: ${CATEGORY_NAMES[k.category] || k.category}</span>` : ''}</span>${topicPicker(s, t.topic, store.state.settings.customTopics, likely)}</div>
     <div class="field"><span class="label">${guessed ? 'Why were you unsure?' : 'Why did you miss it?'}</span>${causePicker(t.cause)}</div>
     <details ${t.note || t.myAnswer || t.correctAnswer ? html`open` : ''}>

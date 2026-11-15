@@ -15,6 +15,7 @@ test('service worker precaches every app file', () => {
       else files.push('/' + p.split('\\').join('/'));
     }
   })('js');
+  for (const f of readdirSync('vendor/pdfjs')) if (f.endsWith('.js')) files.push(`/vendor/pdfjs/${f}`);
   files.push('/css/styles.css', '/index.html', '/manifest.webmanifest');
   for (const f of readdirSync('icons')) if (/\.(png|svg)$/.test(f) && !f.startsWith('maskable.svg')) files.push(`/icons/${f}`);
   const missing = files.filter((f) => !listed.has(f));
