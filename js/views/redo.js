@@ -1,5 +1,6 @@
 // Redo: bring missed questions back on a spaced schedule until they stick.
 import { html, setHTML, safeUrl } from '../safe-html.js';
+import { topicLabel } from '../data/topics.js';
 import * as store from '../store.js';
 import { icon, topbar, sectionBadge, secClass, plural, reportError, toast } from '../ui.js';
 import { SECTIONS } from '../data/act.js';
@@ -43,7 +44,7 @@ export function render(el) {
         <span class="small muted">1 of ${due.length}</span></div>
       <div class="tag-head">
         <div class="qnum">${m.questionNumber || '?'}</div>
-        <div class="grow"><div class="strong">${m.topic || 'Untagged'}</div>
+        <div class="grow"><div class="strong">${topicLabel(m) || 'Untagged'}</div>
           <div class="small muted">${src ? src.title : 'Your own source'}${m.questionNumber ? `, ${SECTIONS[m.section].label} question ${m.questionNumber}` : ''}</div></div>
       </div>
       ${!m.questionNumber && m.note ? html`<p class="small">${m.note}</p>` : ''}
@@ -139,7 +140,7 @@ function redoRow(m, r, sourceOf) {
   const src = sourceOf(m);
   return html`<a class="list-item" href="#/log/${m.id}">
     <span class="sec-dot sec-${m.section}"></span>
-    <div class="grow"><div class="strong">${m.topic || 'Untagged'}${m.questionNumber ? html` <span class="muted">· Q${m.questionNumber}</span>` : ''}</div>
+    <div class="grow"><div class="strong">${topicLabel(m) || 'Untagged'}${m.questionNumber ? html` <span class="muted">· Q${m.questionNumber}</span>` : ''}</div>
       <div class="small muted">${src ? src.short || src.title : 'Own source'}, ${r.dueDate ? `due ${formatDate(r.dueDate)}` : 'retired'}</div></div>
     ${r.status === 'persistent' ? html`<span class="badge badge-danger">${wrongCount(r)} wrong</span>` : html`<span class="badge">${r.interval}d</span>`}
   </a>`;

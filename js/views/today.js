@@ -1,5 +1,6 @@
 // Today: countdown, tonight's tasks, focus, redos, reminders. Switches to taper, logistics, and test-day modes.
 import { html, setHTML } from '../safe-html.js';
+import { topicLabel } from '../data/topics.js';
 import * as store from '../store.js';
 import { icon, topbar, notice, plural, fmtMinutes, toast, reportError, confirmSheet, sectionBadge } from '../ui.js';
 import { taskCard, bindTaskActions, openReschedule } from './components.js';
@@ -192,7 +193,7 @@ export function render(el) {
             <div class="list">${persistent.slice(0, 5).map(
               (m) => html`<a class="list-item" href="#/log/${m.id}">
                 <span class="sec-dot sec-${m.section}"></span>
-                <div class="grow"><div class="strong">${m.topic || 'Untagged'}</div><div class="small muted">${SECTIONS[m.section].label}${m.questionNumber ? `, Q${m.questionNumber}` : ''}${m.fixLine ? `. Fix: ${m.fixLine}` : ''}</div></div>
+                <div class="grow"><div class="strong">${topicLabel(m) || 'Untagged'}</div><div class="small muted">${SECTIONS[m.section].label}${m.questionNumber ? `, Q${m.questionNumber}` : ''}${m.fixLine ? `. Fix: ${m.fixLine}` : ''}</div></div>
                 ${icon('chev', 'chev')}</a>`,
             )}</div>
           </section>`

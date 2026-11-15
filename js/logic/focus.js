@@ -3,6 +3,7 @@ import { CORE_SECTIONS, CAUSES, CAUSE_KEYS, GUESSED_RIGHT_MULT, UNSCORED_MULT, F
 import { estimates, composite, estimatedComposite } from './scoring.js';
 import { ageInDays, dateOf } from './dates.js';
 import { rightCount } from './redo.js';
+import { topicsOf } from '../data/topics.js';
 
 /** Exponential decay with a 10-day half-life. */
 export function recencyDecay(ageDays) {
@@ -115,8 +116,10 @@ export function computeFocus({ attempts = [], misses = [], redos = [], pacing = 
     const sec = info[m.section];
     sec.weight += w;
     topicMaps[m.section] = topicMaps[m.section] || {};
-    const topic = m.topic || 'Untagged';
-    topicMaps[m.section][topic] = (topicMaps[m.section][topic] || 0) + w;
+    // A miss with several topics splits its weight between them, so it isn't counted more than once.
+    const topics = topicsOf(m);
+    const list = topics.length ? topics : ['Untagged'];
+    for (const topic of list) topicMaps[m.section][topic] = (topicMaps[m.section][topic] || 0) + w / list.length;
     const age = ageInDays(missDate(m), today);
     if (age <= FOCUS.dominantCauseWindowDays) {
       const cause = CAUSES[m.cause] ? m.cause : 'content';

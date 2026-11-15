@@ -92,3 +92,12 @@ test('focus sentence from misses also says how many points move the composite', 
 test('a misread miss counts like a careless one', () => {
   assert.equal(missWeight(miss('english', 'Commas', 'misread', today), null, today), 0.8);
 });
+
+test('a miss with several topics splits its weight between them', () => {
+  const m = { ...miss('english', 'Commas', 'content', today), topics: ['Commas', 'Transitions'] };
+  const f = computeFocus({ misses: [m], today });
+  const w = Object.fromEntries(f.bySection.english.topics.map((t) => [t.topic, t.weight]));
+  assert.equal(w.Commas, 0.5);
+  assert.equal(w.Transitions, 0.5);
+  assert.equal(f.bySection.english.weakness, 1);
+});

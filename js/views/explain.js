@@ -2,6 +2,7 @@
 // Chat mode (default, free): copy a prompt into your own Claude chat and paste the reply back.
 // API mode: the app calls /api/explain. Photos are resized on the device and never stored.
 import { html, setHTML } from '../safe-html.js';
+import { topicLabel } from '../data/topics.js';
 import * as store from '../store.js';
 import { icon, topbar, notice, toast, reportError, openSheet, confirmSheet, copyText, chatPanel } from '../ui.js';
 import { explainChatPrompt, parseJsonReply, normalizeExplain } from '../logic/claude-format.js';
@@ -35,7 +36,10 @@ function initForm(query) {
   form = {
     missId: m ? m.id : null,
     section: m ? m.section : 'english',
-    topic: m ? m.topic : '',
+    topic: m ? m.topic || '' : '',
+    // All of the miss's topics, sent to Claude while the main topic is still the one picked.
+    allTopics: m ? topicLabel(m) : '',
+    mainTopic: m ? m.topic || '' : '',
     description: m ? [m.questionNumber ? `Question ${m.questionNumber}` : '', m.note].filter(Boolean).join('. ') : '',
     myAnswer: m ? [m.myAnswer, m.myAnswerText].filter(Boolean).join('. ') : '',
     correctAnswer: m ? [m.correctAnswer, m.correctAnswer ? m.correctAnswerText : ''].filter(Boolean).join('. ') : '',
@@ -56,7 +60,7 @@ export function render(el, ctx) {
 
   setHTML(
     el,
-    html`${topbar('Explain a miss', { back: miss ? `#/log/${miss.id}` : '#/more', eyebrow: miss ? `${SECTIONS[miss.section].label}, ${miss.topic || 'untagged'}` : 'Powered by Claude' })}
+    html`${topbar('Explain a miss', { back: miss ? `#/log/${miss.id}` : '#/more', eyebrow: miss ? `${SECTIONS[miss.section].label}, ${topicLabel(miss) || 'untagged'}` : 'Powered by Claude' })}
     <div class="stack-lg">
       ${!useChat && !online ? notice('warn', "Explain needs internet. Your miss is saved, try again when you're online.") : ''}
       ${!useChat && online && !passcode ? notice('info', html`Add your app passcode in <a href="#/settings">Settings</a> to use Explain.`) : ''}
@@ -183,7 +187,7 @@ export function render(el, ctx) {
       const prompt = explainChatPrompt(
         {
           section: form.section,
-          topic: form.topic,
+          topic: form.topic && form.topic === form.mainTopic ? form.allTopics : form.topic,
           description: form.description.trim(),
           myAnswer: form.myAnswer.trim(),
           correctAnswer: form.correctAnswer.trim(),
@@ -243,7 +247,7 @@ function resultCard(miss) {
 async function requestExplain() {
   const body = {
     section: form.section,
-    topic: form.topic || undefined,
+    topic: (form.topic && form.topic === form.mainTopic ? form.allTopics : form.topic) || undefined,
     description: form.description.trim() || undefined,
     myAnswer: form.myAnswer.trim() || undefined,
     correctAnswer: form.correctAnswer.trim() || undefined,

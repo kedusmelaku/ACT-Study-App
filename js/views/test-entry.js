@@ -9,7 +9,8 @@ import { composite, stem, keyedScores } from '../logic/scoring.js';
 import { FORMS, isKeyed, keyFor, CATEGORY_NAMES, CATEGORY_TOPICS } from '../data/forms.js';
 import { isTimingFlag } from '../logic/focus.js';
 import { isISODate } from '../logic/dates.js';
-import { topicPicker, causePicker, promptNewTopic } from './miss-form.js';
+import { topicPicker, causePicker, promptNewTopic, pickTopic } from './miss-form.js';
+import { topicsOf, toggleTopic, MAX_TOPICS } from '../data/topics.js';
 import { addTestSheet } from './add-test.js';
 import { importResultsSheet } from './import-results.js';
 import { bookletPanel, mountBooklet } from './booklet-view.js';
@@ -102,7 +103,7 @@ function draftFromAttempt(a) {
   for (const m of store.state.misses.filter((x) => x.attemptId === a.id)) {
     if (m.questionNumber) {
       d.marks[m.section][m.questionNumber] = m.guessedRight ? 'guess' : 'miss';
-      d.tags[`${m.section}:${m.questionNumber}`] = { missId: m.id, topic: m.topic, cause: m.cause, note: m.note, myAnswer: m.myAnswer, saidText: m.myAnswerText || '', correctAnswer: m.correctAnswer, fixLine: m.fixLine, createdAt: m.createdAt, explanation: m.explanation };
+      d.tags[`${m.section}:${m.questionNumber}`] = { missId: m.id, topics: topicsOf(m), cause: m.cause, note: m.note, myAnswer: m.myAnswer, saidText: m.myAnswerText || '', correctAnswer: m.correctAnswer, fixLine: m.fixLine, createdAt: m.createdAt, explanation: m.explanation };
     } else {
       d.extraMisses.push(m);
     }
@@ -284,8 +285,9 @@ export function render(el, ctx) {
       return;
     }
     if (b.dataset.topic !== undefined && b.closest('[data-tag-card]')) {
-      currentTag().topic = b.dataset.topic;
-      el.querySelectorAll('[data-topic]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      const tag = currentTag();
+      tag.topics = pickTopic(el, tagTopics(markedKeys()[draft.tagIndex]), b.dataset.topic);
+      delete tag.topic;
       refreshChip(el);
       saveDraft();
       return;
@@ -296,7 +298,9 @@ export function render(el, ctx) {
         const name = await promptNewTopic(key.split(':')[0]);
         if (name) {
           readTagText(el);
-          currentTag().topic = name;
+          const tag = currentTag();
+          tag.topics = toggleTopic(tagTopics(key), name) || tagTopics(key);
+          delete tag.topic;
           draw();
         }
       } catch (err) {
@@ -795,8 +799,19 @@ function tagProgress(key) {
   const [s, q] = key.split(':');
   const t = draft.tags[key] || {};
   const k = keyed() ? keyFor(draft.sourceId, s, q) : null;
-  if (k && k.topic) return t.cause ? 1 : 0;
-  return ((t.topic ? 1 : 0) + (t.cause ? 1 : 0)) / 2;
+  const hasTopic = tagTopics(key).length > 0;
+  if (k && k.topic && hasTopic) return t.cause ? 1 : 0;
+  return ((hasTopic ? 1 : 0) + (t.cause ? 1 : 0)) / 2;
+}
+
+/** A tag's topics: the ones picked, or the key's topic until something is picked. */
+function tagTopics(key) {
+  const t = draft.tags[key] || {};
+  if (Array.isArray(t.topics)) return t.topics;
+  if (t.topic) return [t.topic]; // drafts saved before topics were a list
+  const [s, q] = key.split(':');
+  const k = keyed() ? keyFor(draft.sourceId, s, q) : null;
+  return k && k.topic ? [k.topic] : [];
 }
 
 /** Every marked question in a scrollable row. Each chip fills with its section's color as it's tagged. */
@@ -858,7 +873,7 @@ function stepTag() {
     ${k ? bookletPanel(draft.sourceId, s, q, k) : ''}
     ${hint && hint.text ? html`<div class="q-hint"><p class="q-hint-text">${hint.text}</p></div>` : ''}
     ${reviewBox(key, hint, t, k)}
-    <div class="field"><span class="label">Topic${k && k.category ? html` <span class="hint">Key category: ${CATEGORY_NAMES[k.category] || k.category}</span>` : ''}</span>${topicPicker(s, t.topic || (k && k.topic) || '', store.state.settings.customTopics, likely)}</div>
+    <div class="field"><span class="label">Topics <span class="hint">up to ${MAX_TOPICS}${k && k.category ? `. Key category: ${CATEGORY_NAMES[k.category] || k.category}` : ''}</span></span>${topicPicker(s, tagTopics(key), store.state.settings.customTopics, likely)}</div>
     <div class="field"><span class="label">${guessed ? 'Why were you unsure?' : 'Why did you miss it?'}</span>${causePicker(t.cause)}</div>
     <details ${t.note || t.myAnswer || (t.correctAnswer && (!k || t.correctAnswer !== k.answer)) ? html`open` : ''}>
       <summary class="strong small">Add a note or answer choices</summary>
@@ -1002,7 +1017,8 @@ async function persist() {
       id: t.missId || store.newId('miss'),
       section,
       questionNumber: Number(q),
-      topic: t.topic || (k && k.topic) || '',
+      topics: tagTopics(key),
+      topic: tagTopics(key)[0] || '',
       cause: t.cause || 'content',
       guessedRight: draft.marks[section][q] === 'guess',
       unscored: Boolean(k && k.unscored),

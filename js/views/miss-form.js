@@ -3,7 +3,7 @@ import { html, setHTML } from '../safe-html.js';
 import * as store from '../store.js';
 import { icon, topbar, reportError, undoToast, toast, openSheet } from '../ui.js';
 import { ALL_SECTIONS, SECTIONS, CAUSES, CAUSE_KEYS } from '../data/act.js';
-import { topicsFor } from '../data/topics.js';
+import { topicsFor, topicsOf, toggleTopic, MAX_TOPICS } from '../data/topics.js';
 import { isISODate } from '../logic/dates.js';
 
 export const live = false;
@@ -16,14 +16,18 @@ const CAUSE_HELP = {
   misread: "Didn't read what it asked carefully",
 };
 
-/** Topic chips. `likely` topics (from an answer key's category) are listed first, set apart. */
+/**
+ * Topic chips; up to MAX_TOPICS can be picked. `selected` is the list picked so far (a single topic
+ * string also works). `likely` topics (from an answer key's category) are listed first, set apart.
+ */
 export function topicPicker(section, selected, customTopics, likely = []) {
+  const picked = Array.isArray(selected) ? selected : selected ? [selected] : [];
   const topics = topicsFor(section, customTopics);
-  const all = selected && !topics.includes(selected) ? [...topics, selected] : topics;
+  const all = [...topics, ...picked.filter((t) => !topics.includes(t))];
   const first = all.filter((t) => likely.includes(t));
   const rest = all.filter((t) => !likely.includes(t));
-  const chip = (t) => html`<button type="button" class="chip" data-topic="${t}" aria-pressed="${t === selected}">${t}</button>`;
-  return html`<div role="group" aria-label="Topic">
+  const chip = (t) => html`<button type="button" class="chip" data-topic="${t}" aria-pressed="${picked.includes(t)}">${t}</button>`;
+  return html`<div role="group" aria-label="Topics">
     ${first.length ? html`<div class="chips chips-likely">${first.map(chip)}</div>` : ''}
     <div class="chips">
       ${rest.map(chip)}
@@ -38,6 +42,20 @@ export function causePicker(selected) {
       (c) => html`<button type="button" class="chip chip-lg" data-cause="${c}" aria-pressed="${c === selected}"><span>${CAUSES[c].label}</span><small>${CAUSE_HELP[c]}</small></button>`,
     )}
   </div>`;
+}
+
+/**
+ * Toggle a topic in a picked list and update the chips under root. Returns the new list, or the old
+ * one (with a short message) when it's already full.
+ */
+export function pickTopic(root, list, topic) {
+  const next = toggleTopic(list, topic);
+  if (!next) {
+    toast(`Up to ${MAX_TOPICS} topics. Tap one to remove it.`);
+    return list;
+  }
+  root.querySelectorAll('[data-topic]').forEach((b) => b.setAttribute('aria-pressed', String(next.includes(b.dataset.topic))));
+  return next;
 }
 
 /** Ask for a custom topic name and save it for the section. Returns the name or null. */
@@ -74,7 +92,7 @@ export async function promptNewTopic(section) {
 export function mountMissForm(root, { miss, onSubmit, submitLabel = 'Save miss', showSource = true }) {
   const state = {
     section: miss.section || 'english',
-    topic: miss.topic || '',
+    topics: topicsOf(miss),
     cause: miss.cause || '',
     guessedRight: !!miss.guessedRight,
   };
@@ -105,7 +123,7 @@ export function mountMissForm(root, { miss, onSubmit, submitLabel = 'Save miss',
               </div>
             </div>`
           : ''}
-        <div class="field"><span class="label">Topic</span>${topicPicker(state.section, state.topic, store.state.settings.customTopics)}</div>
+        <div class="field"><span class="label">Topics <span class="hint">up to ${MAX_TOPICS}</span></span>${topicPicker(state.section, state.topics, store.state.settings.customTopics)}</div>
         <div class="field"><span class="label">Cause</span>${causePicker(state.cause)}</div>
         <label class="check-row"><span class="switch"><input type="checkbox" name="guessedRight" ${state.guessedRight ? html`checked` : ''}><span></span></span>
           <span class="grow"><span class="strong">Guessed right</span><br><span class="small muted">I got it right only by guessing. Counts at half weight.</span></span></label>
@@ -127,22 +145,21 @@ export function mountMissForm(root, { miss, onSubmit, submitLabel = 'Save miss',
     if (sec) {
       if (state.section !== sec.dataset.section) {
         state.section = sec.dataset.section;
-        state.topic = '';
+        state.topics = [];
         draw();
       }
       return;
     }
     const t = e.target.closest('[data-topic]');
     if (t) {
-      state.topic = t.dataset.topic;
-      root.querySelectorAll('[data-topic]').forEach((b) => b.setAttribute('aria-pressed', String(b === t)));
+      state.topics = pickTopic(root, state.topics, t.dataset.topic);
       return;
     }
     if (e.target.closest('[data-topic-new]')) {
       try {
         const name = await promptNewTopic(state.section);
         if (name) {
-          state.topic = name;
+          state.topics = toggleTopic(state.topics, name) || state.topics;
           draw();
         }
       } catch (err) {
@@ -164,7 +181,7 @@ export function mountMissForm(root, { miss, onSubmit, submitLabel = 'Save miss',
     const v = readText(root);
     const err = root.querySelector('[data-error]');
     const problems = [];
-    if (!state.topic) problems.push('Pick a topic.');
+    if (!state.topics.length) problems.push('Pick a topic.');
     if (!state.cause) problems.push('Pick a cause.');
     if (v.date && !isISODate(v.date)) problems.push('Check the date.');
     if (v.questionNumber && !/^\d{1,3}$/.test(v.questionNumber)) problems.push('Question number should be a number.');
@@ -179,7 +196,8 @@ export function mountMissForm(root, { miss, onSubmit, submitLabel = 'Save miss',
     try {
       await onSubmit({
         section: state.section,
-        topic: state.topic,
+        topics: state.topics,
+        topic: state.topics[0],
         cause: state.cause,
         guessedRight: state.guessedRight,
         sourceId: v.sourceId ?? miss.sourceId ?? null,

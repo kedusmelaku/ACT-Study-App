@@ -3,6 +3,7 @@ import { addDays, compareDates, dayOfWeek, daysBetween } from './dates.js';
 import { dayCapacity } from './phase.js';
 import { dueRedos } from './redo.js';
 import { DAY_NAMES } from '../data/calendar.js';
+import { topicsOf } from '../data/topics.js';
 
 const WINDOW = 14;
 
@@ -110,7 +111,7 @@ export function detectHabits({ tasks = [], settings = {}, misses = [], redos = [
   }
 
   // Untagged misses.
-  const untagged = misses.filter((m) => !m.topic).length;
+  const untagged = misses.filter((m) => !topicsOf(m).length).length;
   if (untagged >= 3) {
     out.push({
       id: 'untagged',

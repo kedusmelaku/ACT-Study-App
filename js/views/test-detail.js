@@ -1,5 +1,6 @@
 // One attempt: scores, pacing, and its misses.
 import { html, setHTML } from '../safe-html.js';
+import { topicLabel, topicsOf } from '../data/topics.js';
 import * as store from '../store.js';
 import { icon, topbar, sectionBadge, causeBadge, undoToast, reportError, confirmSheet, plural } from '../ui.js';
 import { ALL_SECTIONS, SECTIONS, ATTEMPT_KINDS } from '../data/act.js';
@@ -21,7 +22,7 @@ export function render(el, ctx) {
   const st = stemOf(a.scores);
   const pacing = s.pacing.filter((p) => p.attemptId === a.id);
   const misses = s.misses.filter((m) => m.attemptId === a.id).sort((x, y) => ALL_SECTIONS.indexOf(x.section) - ALL_SECTIONS.indexOf(y.section) || (x.questionNumber || 0) - (y.questionNumber || 0));
-  const untagged = misses.filter((m) => !m.topic).length;
+  const untagged = misses.filter((m) => !topicsOf(m).length).length;
 
   setHTML(
     el,
@@ -50,7 +51,7 @@ export function render(el, ctx) {
             ? html`<div class="list">${misses.map(
                 (m) => html`<a class="list-item" href="#/log/${m.id}">
                   <div class="qnum sec-${m.section}" style="width:40px;height:40px;font-size:0.95rem;border-radius:11px">${m.questionNumber || '?'}</div>
-                  <div class="grow"><div class="strong">${m.topic || 'Untagged'}</div><div class="row-wrap" style="margin-top:4px">${sectionBadge(m.section)}${causeBadge(m.cause, m.guessedRight)}${m.unscored ? html`<span class="badge">Not scored</span>` : ''}</div></div>
+                  <div class="grow"><div class="strong">${topicLabel(m) || 'Untagged'}</div><div class="row-wrap" style="margin-top:4px">${sectionBadge(m.section)}${causeBadge(m.cause, m.guessedRight)}${m.unscored ? html`<span class="badge">Not scored</span>` : ''}</div></div>
                   ${icon('chev', 'chev')}</a>`,
               )}</div>`
             : html`<div class="day-empty">No misses logged for this test.</div>`}

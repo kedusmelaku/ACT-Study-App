@@ -1,5 +1,6 @@
 // History: skipped, moved, dropped, deleted, and plan-replaced items, so nothing disappears without a reason.
 import { html, setHTML } from '../safe-html.js';
+import { topicLabel } from '../data/topics.js';
 import * as store from '../store.js';
 import { icon, topbar, emptyState, sectionBadge, toast, reportError, plural } from '../ui.js';
 import { openReschedule } from './components.js';
@@ -75,7 +76,7 @@ function deletedCard(g) {
     sub = `Taken ${formatDate(a.date)}${misses.length ? `, with ${plural(misses.length, 'miss', 'misses')}` : ''}`;
   } else if (misses.length === 1) {
     const m = misses[0];
-    title = `Miss: ${m.topic || 'Untagged'}${m.questionNumber ? ` (Q${m.questionNumber})` : ''}`;
+    title = `Miss: ${topicLabel(m) || 'Untagged'}${m.questionNumber ? ` (Q${m.questionNumber})` : ''}`;
     sub = `${SECTIONS[m.section] ? SECTIONS[m.section].label : ''}${m.fixLine ? `. Fix: ${m.fixLine}` : ''}`;
   } else {
     title = plural(misses.length || g.items.length, 'item');

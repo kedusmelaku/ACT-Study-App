@@ -1,5 +1,6 @@
 // Error log: filterable list of misses.
 import { html, setHTML } from '../safe-html.js';
+import { topicLabel, topicsOf } from '../data/topics.js';
 import * as store from '../store.js';
 import { icon, topbar, emptyState, sectionBadge, causeBadge, secClass, undoToast, reportError, plural } from '../ui.js';
 import { ALL_SECTIONS, SECTIONS, CAUSES, CAUSE_KEYS } from '../data/act.js';
@@ -25,14 +26,14 @@ export function render(el, ctx) {
   const all = s.misses.slice().sort((a, b) => (missDate(b) + (b.createdAt || '')).localeCompare(missDate(a) + (a.createdAt || '')));
   const list = all.filter((m) => {
     if (filters.section !== 'all' && m.section !== filters.section) return false;
-    if (filters.topic !== 'all' && m.topic !== filters.topic) return false;
+    if (filters.topic !== 'all' && !topicsOf(m).includes(filters.topic)) return false;
     if (filters.cause !== 'all') {
       if (filters.cause === 'guessed' ? !m.guessedRight : m.cause !== filters.cause || m.guessedRight) return false;
     }
     if (filters.range !== 'all' && ageInDays(missDate(m), today) > Number(filters.range)) return false;
     return true;
   });
-  const topics = [...new Set(all.filter((m) => filters.section === 'all' || m.section === filters.section).map((m) => m.topic).filter(Boolean))].sort();
+  const topics = [...new Set(all.filter((m) => filters.section === 'all' || m.section === filters.section).flatMap((m) => topicsOf(m)))].sort();
   const sourceName = (id) => {
     const m = mats.find((x) => x.sourceId === id);
     return m ? m.short || m.title : '';
@@ -125,7 +126,7 @@ function missCard(m, source) {
           ${redo && redo.status === 'persistent' ? html`<span class="badge badge-danger">Persistent</span>` : ''}
           ${redo && redo.status === 'retired' ? html`<span class="badge badge-success">Retired</span>` : ''}
         </div>
-        <div class="miss-topic">${m.topic || 'Untagged'}${m.questionNumber ? html` <span class="muted">· Q${m.questionNumber}</span>` : ''}</div>
+        <div class="miss-topic">${topicLabel(m) || 'Untagged'}${m.questionNumber ? html` <span class="muted">· Q${m.questionNumber}</span>` : ''}</div>
         <div class="small muted">${[source, formatDate(missDate(m))].filter(Boolean).join(', ')}${m.myAnswer || m.correctAnswer ? `. You: ${m.myAnswer || '?'}, key: ${m.correctAnswer || '?'}` : ''}</div>
       </div>
     </div>

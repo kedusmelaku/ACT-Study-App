@@ -73,3 +73,25 @@ export function topicsFor(section, customTopics = {}) {
   }
   return out;
 }
+
+/** A miss can be labeled with up to this many topics. The first is its main topic. */
+export const MAX_TOPICS = 3;
+
+/** A miss's topics, main one first. Older misses only have `topic`. */
+export function topicsOf(m) {
+  if (!m) return [];
+  const list = Array.isArray(m.topics) && m.topics.length ? m.topics : m.topic ? [m.topic] : [];
+  return [...new Set(list.map((t) => String(t || '').trim()).filter(Boolean))].slice(0, MAX_TOPICS);
+}
+
+/** "Commas, Transitions" for display, or '' when untagged. */
+export function topicLabel(m) {
+  return topicsOf(m).join(', ');
+}
+
+/** Add or remove a topic from a list. Returns null when the list is already full. */
+export function toggleTopic(list, topic) {
+  if (list.includes(topic)) return list.filter((t) => t !== topic);
+  if (list.length >= MAX_TOPICS) return null;
+  return [...list, topic];
+}

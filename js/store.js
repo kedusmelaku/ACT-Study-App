@@ -3,6 +3,7 @@ import * as db from './db.js';
 import { defaultSettings } from './data/calendar.js';
 import { buildMaterials, builtInFor } from './data/materials.js';
 import { keyFor } from './data/forms.js';
+import { topicsOf } from './data/topics.js';
 import { ALL_SECTIONS, CORE_SECTIONS } from './data/act.js';
 import { computeFocus } from './logic/focus.js';
 import { generateWeek, heavyNight as planHeavyNight, rescheduleTask as planReschedule, rescheduleProblem } from './logic/planner.js';
@@ -332,7 +333,8 @@ function cleanMiss(m) {
     sourceId: m.sourceId || null,
     section: m.section,
     questionNumber: m.questionNumber ? Number(m.questionNumber) : null,
-    topic: m.topic || '',
+    topics: topicsOf(m),
+    topic: topicsOf(m)[0] || '',
     cause: m.cause || 'content',
     myAnswer: m.myAnswer || '',
     // The text of the chosen and correct choices (from the results page or the attached booklet).
