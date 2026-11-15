@@ -95,7 +95,7 @@ export async function get(store, key) {
   return promisify(db.transaction(store, 'readonly').objectStore(store).get(key));
 }
 
-/** Booklet records: { sourceId, sha, size, blob, uploaded, attachedAt }. No sync stamps. */
+/** Booklet records: { sourceId, sha, size, blob, uploadedTo (sync code it was uploaded to), attachedAt }. No sync stamps. */
 export async function getBooklet(sourceId) {
   return get(BOOKLET_STORE, sourceId);
 }

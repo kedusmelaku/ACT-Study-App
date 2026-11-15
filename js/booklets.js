@@ -7,10 +7,11 @@ import { BOOKLETS } from './data/forms.js';
 
 const PDFJS = new URL('../vendor/pdfjs/pdf.min.js', import.meta.url).href;
 const PDFJS_WORKER = new URL('../vendor/pdfjs/pdf.worker.min.js', import.meta.url).href;
-const CHUNK_BYTES = 512 * 1024;
+// Small chunks keep each request well under any request size limit (Vercel, Upstash).
+const CHUNK_BYTES = 256 * 1024;
 const MAX_FILE_BYTES = 15 * 1024 * 1024;
 
-// sourceId -> 'attached' | 'uploading' | 'downloading'
+// sourceId -> 'attached' | 'uploading' | 'downloading' | 'failed'
 const status = {};
 const listeners = new Set();
 const docs = new Map();
@@ -36,13 +37,23 @@ export function statusOf(sourceId) {
 
 export function hasBooklet(sourceId) {
   const s = status[sourceId];
-  return s === 'attached' || s === 'uploading';
+  return s === 'attached' || s === 'uploading' || s === 'failed';
+}
+
+function code() {
+  const s = store.state.settings.sync;
+  return (s && s.code) || '';
+}
+
+/** Uploaded to the sync space this device uses now (not just to some earlier space). */
+function uploadedHere(rec) {
+  return !!rec.uploadedTo && rec.uploadedTo === code();
 }
 
 /** Read which booklets are on this device. Call once at startup. */
 export async function loadStatus() {
   try {
-    for (const b of await db.allBooklets()) status[b.sourceId] = b.uploaded || !syncOn() ? 'attached' : 'uploading';
+    for (const b of await db.allBooklets()) status[b.sourceId] = uploadedHere(b) || !syncOn() ? 'attached' : 'uploading';
   } catch (e) {
     console.error('Could not read booklets', e);
   }
@@ -94,7 +105,7 @@ export async function attach(sourceId, file) {
   } finally {
     if (pdf) pdf.destroy();
   }
-  const rec = { sourceId, sha: await sha256(buf), size: buf.byteLength, blob: new Blob([buf], { type: 'application/pdf' }), uploaded: false, attachedAt: new Date().toISOString() };
+  const rec = { sourceId, sha: await sha256(buf), size: buf.byteLength, blob: new Blob([buf], { type: 'application/pdf' }), uploadedTo: '', attachedAt: new Date().toISOString() };
   await db.putBooklet(rec);
   docs.delete(sourceId);
   status[sourceId] = syncOn() ? 'uploading' : 'attached';
@@ -106,7 +117,7 @@ export async function attach(sourceId, file) {
 async function post(body) {
   const res = await fetch('/api/booklet', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-sync-code': store.state.settings.sync.code },
+    headers: { 'content-type': 'application/json', 'x-sync-code': code() },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`booklet ${body.op} failed: ${res.status}`);
@@ -126,12 +137,15 @@ function fromBase64(b64) {
 }
 
 async function upload(rec) {
+  const space = code();
   const bytes = new Uint8Array(await rec.blob.arrayBuffer());
   const count = Math.ceil(bytes.length / CHUNK_BYTES);
   for (let i = 0; i < count; i++) {
     await post({ op: 'put', sourceId: rec.sourceId, sha: rec.sha, size: rec.size, count, index: i, data: toBase64(bytes.subarray(i * CHUNK_BYTES, (i + 1) * CHUNK_BYTES)) });
   }
-  await db.putBooklet({ ...rec, uploaded: true });
+  // Re-read so a record replaced meanwhile isn't overwritten with the old file.
+  const now = await db.getBooklet(rec.sourceId);
+  if (now && now.sha === rec.sha) await db.putBooklet({ ...now, uploadedTo: space });
 }
 
 async function download(sourceId, meta) {
@@ -143,7 +157,7 @@ async function download(sourceId, meta) {
   const blob = new Blob(parts, { type: 'application/pdf' });
   const buf = await blob.arrayBuffer();
   if ((await sha256(buf)) !== meta.sha) throw new Error('Booklet download did not match');
-  await db.putBooklet({ sourceId, sha: meta.sha, size: buf.byteLength, blob, uploaded: true, attachedAt: meta.at || new Date().toISOString() });
+  await db.putBooklet({ sourceId, sha: meta.sha, size: buf.byteLength, blob, uploadedTo: code(), attachedAt: meta.at || new Date().toISOString() });
   docs.delete(sourceId);
 }
 
@@ -153,18 +167,33 @@ export function syncBooklets() {
   if (syncing) return syncing;
   syncing = (async () => {
     const local = new Map((await db.allBooklets()).map((b) => [b.sourceId, b]));
+    const { booklets: remote = {} } = await post({ op: 'list' });
+    // Upload what this sync space doesn't have yet: attached here before sync was on, attached while
+    // this device used a different sync code, or an upload that didn't finish.
     for (const rec of local.values()) {
-      if (rec.uploaded) continue;
+      const there = remote[rec.sourceId];
+      if (there && (there.sha === rec.sha || uploadedHere(rec))) continue;
       status[rec.sourceId] = 'uploading';
       emit();
-      await upload(rec);
-      status[rec.sourceId] = 'attached';
+      try {
+        await upload(rec);
+        status[rec.sourceId] = 'attached';
+        remote[rec.sourceId] = { sha: rec.sha };
+      } catch (e) {
+        console.error('Booklet upload failed', e);
+        status[rec.sourceId] = 'failed';
+      }
       emit();
     }
-    const { booklets } = await post({ op: 'list' });
-    for (const [sourceId, meta] of Object.entries(booklets || {})) {
+    // Download what other devices attached.
+    for (const [sourceId, meta] of Object.entries(remote)) {
       const mine = local.get(sourceId);
-      if (mine && (mine.sha === meta.sha || !mine.uploaded)) continue;
+      if (mine && mine.sha === meta.sha) {
+        if (!uploadedHere(mine)) await db.putBooklet({ ...mine, uploadedTo: code() });
+        continue;
+      }
+      if (mine && !uploadedHere(mine)) continue;
+      if (!meta.count) continue;
       status[sourceId] = 'downloading';
       emit();
       try {

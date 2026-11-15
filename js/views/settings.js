@@ -233,10 +233,17 @@ function bookletRows() {
   return html`${Object.keys(BOOKLETS).map((id) => {
     const title = `Official Practice Test ${id.split('-')[1]}`;
     const st = booklets.statusOf(id);
-    const line = st === 'downloading' ? 'Downloading booklet' : st === 'uploading' ? 'Booklet attached, uploading' : st === 'attached' ? 'Booklet attached' : 'No booklet yet';
+    const line =
+      st === 'downloading' ? 'Downloading booklet'
+      : st === 'uploading' ? 'Booklet attached, uploading'
+      : st === 'failed' ? "Booklet attached here, but it didn't upload"
+      : st === 'attached' ? 'Booklet attached'
+      : 'No booklet yet';
     return html`<div class="list-item"><span class="list-icon">${icon(st === 'attached' ? 'check' : 'tests')}</span>
       <div class="grow"><div class="strong">${title}</div><div class="small muted">${line}</div></div>
-      ${st
+      ${st === 'failed'
+        ? html`<button type="button" class="btn btn-secondary btn-sm" data-action="booklet-retry">Try again</button>`
+        : st
         ? ''
         : html`<label class="btn btn-secondary btn-sm file-btn">Attach booklet<input type="file" accept="application/pdf,.pdf" data-booklet-file="${id}"></label>`}</div>`;
   })}`;
@@ -336,6 +343,10 @@ function bind(el) {
       const cur = Number(s.availability[d]) || 0;
       const next = Math.max(0, Math.min(300, cur + dir * STEP));
       return save({ availability: { ...s.availability, [d]: next } });
+    }
+    if (e.target.closest('[data-action="booklet-retry"]')) {
+      booklets.syncBooklets();
+      return;
     }
     const et = e.target.closest('[data-edit-test]');
     if (et) {

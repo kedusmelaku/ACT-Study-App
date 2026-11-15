@@ -14,8 +14,8 @@ import { normalizeSyncCode } from '../js/logic/sync.js';
 import { spaceFor } from './sync.js';
 
 export const BOOKLET_IDS = Object.freeze(['enhanced-1', 'enhanced-2', 'enhanced-3', 'enhanced-4']);
-export const MAX_CHUNKS = 40;
-// 512 KB of PDF per chunk is about 700 KB of base64, well under the request limit.
+export const MAX_CHUNKS = 64;
+// The app sends 256 KB of PDF per chunk (about 350 KB of base64). This allows up to about 1 MB.
 export const MAX_CHUNK_B64 = 1_000_000;
 export const MAX_BOOKLET_BYTES = 15 * 1024 * 1024;
 
