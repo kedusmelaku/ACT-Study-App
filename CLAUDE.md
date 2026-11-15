@@ -16,7 +16,7 @@ Kedus already scores around 34. His gains come from 1 to 3 questions per section
 4. Bring missed questions back on a spaced schedule until they stick.
 5. Use Claude to explain misses and give a short weekly coaching note.
 
-**It is not a question bank.** Official ACT materials are the practice source. The app points to them, tracks which ones were used, and never stores official question text.
+**It is not a question bank.** Official ACT materials are the practice source. The app points to them and tracks which ones were used. Official question content can be stored from booklets the user attaches, on their devices and in their private sync space only. Never in the repo or anywhere publicly reachable.
 
 The app must still be useful after Dec 12: he has a school-day ACT in April 2027, so test dates are configurable and the app supports multiple real attempts.
 

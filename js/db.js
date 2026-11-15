@@ -7,7 +7,7 @@ import { tombstone } from './logic/sync.js';
 
 export const DB_NAME = 'act-prep';
 /** Bump when stores or indexes change, and add a migration below. */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const STORES = Object.freeze({
   settings: { keyPath: 'id' },
@@ -21,6 +21,10 @@ export const STORES = Object.freeze({
 });
 export const STORE_NAMES = Object.freeze(Object.keys(STORES));
 
+// Attached booklet PDFs live in their own device-only store. They're not in STORES, so they never
+// go into state, sync records, or the JSON export. Booklet sync has its own path (js/booklets.js).
+export const BOOKLET_STORE = 'booklets';
+
 /** Migrations by target version. Each runs inside the upgrade transaction. */
 const MIGRATIONS = {
   1(db) {
@@ -29,6 +33,9 @@ const MIGRATIONS = {
       const store = db.createObjectStore(name, { keyPath: def.keyPath });
       for (const [idx, path] of def.indexes || []) store.createIndex(idx, path, { unique: false });
     }
+  },
+  2(db) {
+    if (!db.objectStoreNames.contains(BOOKLET_STORE)) db.createObjectStore(BOOKLET_STORE, { keyPath: 'sourceId' });
   },
 };
 
@@ -86,6 +93,21 @@ export async function getAll(store) {
 export async function get(store, key) {
   const db = await openDB();
   return promisify(db.transaction(store, 'readonly').objectStore(store).get(key));
+}
+
+/** Booklet records: { sourceId, sha, size, blob, uploaded, attachedAt }. No sync stamps. */
+export async function getBooklet(sourceId) {
+  return get(BOOKLET_STORE, sourceId);
+}
+export async function allBooklets() {
+  return getAll(BOOKLET_STORE);
+}
+export async function putBooklet(rec) {
+  const db = await openDB();
+  const tx = db.transaction(BOOKLET_STORE, 'readwrite');
+  tx.objectStore(BOOKLET_STORE).put(rec);
+  await done(tx);
+  return rec;
 }
 
 export async function put(store, value) {

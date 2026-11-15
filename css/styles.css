@@ -712,3 +712,18 @@ summary { cursor: pointer; min-height: 32px; display: list-item; }
 .q-hint { border-left: 3px solid var(--border); padding: 4px 0 4px 12px; display: grid; gap: 4px; }
 .q-hint p { margin: 0; }
 .q-hint-text { font-size: 0.95rem; }
+
+/* ---------- booklet pages ---------- */
+.bk { display: grid; gap: 8px; }
+.bk-frame { display: block; width: 100%; min-height: 160px; padding: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #fff; cursor: zoom-in; }
+.bk-frame .bk-loading { display: block; padding: 24px; }
+.bk-canvas { display: block; width: 100%; height: auto; }
+.bk .spread svg { width: 18px; height: 18px; flex: none; }
+.seg-sm button { min-height: 36px; font-size: 0.88rem; }
+.bk-zoom { width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: var(--bg); color: var(--text); display: flex; flex-direction: column; }
+.bk-zoom:not([open]) { display: none; }
+.bk-zoom::backdrop { background: rgba(0, 0, 0, 0.6); }
+.bk-zoom-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.bk-zoom-body { flex: 1; overflow: auto; touch-action: none; background: var(--surface-2); }
+.bk-zoom-canvas { display: block; height: auto; background: #fff; }
+.is-busy { opacity: 0.6; pointer-events: none; }

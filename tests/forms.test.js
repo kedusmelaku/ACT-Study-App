@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FORMS, keyFor, CATEGORY_TOPICS } from '../js/data/forms.js';
+import { FORMS, keyFor, CATEGORY_TOPICS, TOPIC_CODES, BOOKLETS, bookletLetter } from '../js/data/forms.js';
 import { SECTIONS, ALL_SECTIONS, UNSCORED_MULT, GUESSED_RIGHT_MULT } from '../js/data/act.js';
 import { buildMaterials } from '../js/data/materials.js';
 import { DEFAULT_TOPICS } from '../js/data/topics.js';
@@ -50,6 +50,55 @@ for (const [id, form] of Object.entries(FORMS)) {
   }
 }
 
+// What a reporting category allows, so a topic can't contradict the official key.
+const ALLOWED = {
+  english: {
+    CSE: ['CM', 'SC', 'DP', 'AP', 'SB', 'SV', 'PR', 'VT', 'MO', 'PA'],
+    POW: ['TR', 'AD', 'OR'],
+    KLA: ['WC', 'CO', 'TR', 'PA'],
+  },
+  math: { G: ['PG', 'CG', 'CS', 'TG', 'VC'], S: ['ST', 'PB'], N: ['NQ', 'CX', 'MX', 'VC', 'EL', 'WP'] },
+  reading: { KID: ['MI', 'DT', 'IN'], CS: ['VC', 'AP', 'FP', 'IN'], IKI: ['CP', 'DG', 'IN', 'FP'] },
+};
+
+for (const [id, form] of Object.entries(FORMS)) {
+  test(`forms: ${id} every question has a topic and a booklet page`, () => {
+    const book = BOOKLETS[id];
+    assert.ok(book && /^QU\d/.test(book.code));
+    for (const s of ALL_SECTIONS) {
+      const f = form[s];
+      const codes = f.topics.split(' ');
+      assert.equal(codes.length, f.total, `${s} topic count`);
+      assert.equal(f.pages.length, f.total, `${s} page count`);
+      assert.equal(f.passagePages.length, f.total);
+      const cats = f.categories.split(' ');
+      for (let q = 1; q <= f.total; q++) {
+        const name = TOPIC_CODES[s][codes[q - 1]];
+        assert.ok(name && DEFAULT_TOPICS[s].includes(name), `${s} Q${q} topic ${codes[q - 1]}`);
+        const page = f.pages[q - 1];
+        assert.ok(Number.isInteger(page) && page >= 1 && page <= book.pages, `${s} Q${q} page`);
+        if (q > 1) assert.ok(page >= f.pages[q - 2], `${s} pages run in order at Q${q}`);
+        const pp = f.passagePages[q - 1];
+        if (pp) assert.ok(pp < page, `${s} Q${q} passage page comes before the question page`);
+        const allowed = (ALLOWED[s] || {})[cats[q - 1]];
+        if (allowed) assert.ok(allowed.includes(codes[q - 1]), `${s} Q${q}: ${cats[q - 1]} question tagged ${name}`);
+      }
+    }
+  });
+}
+
+test('acceptance: Practice Test 3 topics land on the hand-tagged ones', () => {
+  const topic = (s, q) => keyFor('enhanced-3', s, q).topic;
+  assert.equal(topic('english', 8), 'Transitions');
+  assert.equal(topic('english', 26), 'Subject-verb agreement');
+  assert.equal(topic('english', 36), 'Subject-verb agreement');
+  assert.equal(topic('english', 28), 'Add, delete, or revise');
+  assert.equal(topic('english', 41), 'Commas');
+  assert.equal(topic('math', 36), 'Number and quantity');
+  assert.equal(topic('science', 34), 'Data representation');
+  assert.equal(topic('science', 39), 'Conflicting viewpoints');
+});
+
 test('forms: likely topics are real default topics', () => {
   for (const [s, map] of Object.entries(CATEGORY_TOPICS)) {
     for (const list of Object.values(map)) for (const t of list) assert.ok(DEFAULT_TOPICS[s].includes(t), `${s}: ${t}`);
@@ -57,10 +106,17 @@ test('forms: likely topics are real default topics', () => {
 });
 
 test('forms: spot checks against the printed keys', () => {
-  assert.deepEqual(keyFor('enhanced-3', 'reading', 10), { answer: 'B', unscored: true, category: null });
-  assert.deepEqual(keyFor('enhanced-3', 'math', 1), { answer: 'B', unscored: false, category: 'G' });
-  assert.deepEqual(keyFor('enhanced-1', 'english', 41), { answer: 'A', unscored: true, category: null });
-  assert.deepEqual(keyFor('enhanced-2', 'science', 13), { answer: 'A', unscored: false, category: 'SIN' });
+  const pick = (k) => ({ answer: k.answer, unscored: k.unscored, category: k.category });
+  assert.deepEqual(pick(keyFor('enhanced-3', 'reading', 10)), { answer: 'B', unscored: true, category: null });
+  assert.deepEqual(pick(keyFor('enhanced-3', 'math', 1)), { answer: 'B', unscored: false, category: 'G' });
+  assert.deepEqual(pick(keyFor('enhanced-1', 'english', 41)), { answer: 'A', unscored: true, category: null });
+  assert.deepEqual(pick(keyFor('enhanced-2', 'science', 13)), { answer: 'A', unscored: false, category: 'SIN' });
+  // Booklet pages checked against the rendered booklet.
+  assert.equal(keyFor('enhanced-3', 'math', 36).page, 25);
+  assert.equal(keyFor('enhanced-3', 'english', 20).passagePage, 6);
+  assert.equal(keyFor('enhanced-1', 'math', 4).page, 27);
+  assert.equal(bookletLetter('C', 20), 'H');
+  assert.equal(bookletLetter('C', 21), 'C');
   assert.equal(FORMS['enhanced-3'].math.table[36], 31);
   assert.equal(FORMS['enhanced-1'].english.table[35], 29);
   assert.equal(keyFor('enhanced-1', 'english', 51), null);

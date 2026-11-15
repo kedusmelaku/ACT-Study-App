@@ -6,6 +6,7 @@ import { extname, join, normalize, resolve } from 'node:path';
 import explain from '../api/explain.js';
 import coach from '../api/coach.js';
 import sync from '../api/sync.js';
+import booklet from '../api/booklet.js';
 
 const root = resolve(new URL('..', import.meta.url).pathname);
 const port = Number(process.argv[2]) || 3000;
@@ -18,7 +19,7 @@ const TYPES = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
 };
-const ROUTES = { '/api/explain': explain, '/api/coach': coach, '/api/sync': sync };
+const ROUTES = { '/api/explain': explain, '/api/coach': coach, '/api/sync': sync, '/api/booklet': booklet };
 
 http
   .createServer(async (req, res) => {

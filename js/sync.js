@@ -4,6 +4,7 @@
 import * as store from './store.js';
 import * as db from './db.js';
 import { outgoingChanges, generateSyncCode, normalizeSyncCode } from './logic/sync.js';
+import { syncBooklets } from './booklets.js';
 
 const PUSH_BATCH = 300;
 const PUSH_MAX_BYTES = 1_500_000;
@@ -115,6 +116,8 @@ async function run() {
       { lastPushAt: startedAt, lastPullSeq: since, lastSyncAt: new Date().toISOString(), lastError: null },
       { forceSettings: serverSettings },
     );
+    // Booklets go through their own route and run in the background.
+    syncBooklets().catch(() => {});
     return { pushed: changes.length, accepted: pushed, pulled: records.length, applied: result.applied };
   } catch (e) {
     console.error('Sync failed', e);

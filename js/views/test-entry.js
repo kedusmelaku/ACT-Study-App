@@ -12,6 +12,8 @@ import { isISODate } from '../logic/dates.js';
 import { topicPicker, causePicker, promptNewTopic } from './miss-form.js';
 import { addTestSheet } from './add-test.js';
 import { importResultsSheet } from './import-results.js';
+import { bookletPanel, mountBooklet } from './booklet-view.js';
+import { onChange as onBookletChange } from '../booklets.js';
 import { parseResults, splitSections, checkResults } from '../logic/results-import.js';
 
 export const live = false;
@@ -229,6 +231,7 @@ export function render(el, ctx) {
           ${views[ids[step]]()}
         </div>`,
     );
+    mountBooklet(el);
     saveDraft();
   };
 
@@ -478,6 +481,12 @@ export function render(el, ctx) {
   }
 
   draw();
+  // A booklet that finishes downloading shows up on the tag card right away.
+  return onBookletChange(() => {
+    if (!draft || stepId() !== 'tag' || !el.isConnected) return;
+    readTagText(el);
+    draw();
+  });
 }
 
 function currentTag() {
@@ -727,17 +736,18 @@ function stepTag() {
       <div class="grow"><div class="strong">${SECTIONS[s].label}, question ${q}</div><div class="small muted">${sub.join('. ')}</div></div>
       ${k ? html`<div class="key-tags">${k.unscored ? html`<span class="badge badge-muted">Not scored</span>` : ''}<span class="badge">Key: ${k.answer}</span></div>` : ''}
     </div>
+    ${k ? bookletPanel(draft.sourceId, s, q, k) : ''}
     ${hint && (hint.text || hint.answer)
       ? html`<div class="q-hint">${hint.text ? html`<p class="q-hint-text">${hint.text}</p>` : ''}${hint.answer ? html`<p class="small muted">Your answer: ${hint.answer}</p>` : ''}</div>`
       : ''}
-    <div class="field"><span class="label">Topic${k && k.category ? html` <span class="hint">Key category: ${CATEGORY_NAMES[k.category] || k.category}</span>` : ''}</span>${topicPicker(s, t.topic, store.state.settings.customTopics, likely)}</div>
+    <div class="field"><span class="label">Topic${k && k.category ? html` <span class="hint">Key category: ${CATEGORY_NAMES[k.category] || k.category}</span>` : ''}</span>${topicPicker(s, t.topic || (k && k.topic) || '', store.state.settings.customTopics, likely)}</div>
     <div class="field"><span class="label">${guessed ? 'Why were you unsure?' : 'Why did you miss it?'}</span>${causePicker(t.cause)}</div>
-    <details ${t.note || t.myAnswer || t.correctAnswer ? html`open` : ''}>
+    <details ${t.note || t.myAnswer || (t.correctAnswer && (!k || t.correctAnswer !== k.answer)) ? html`open` : ''}>
       <summary class="strong small">Add a note or answer choices</summary>
       <div class="stack mt">
         <div class="grid-2">
           <div class="field"><label>My answer</label><input class="input" name="myAnswer" maxlength="20" value="${t.myAnswer || ''}" placeholder="e.g. B"></div>
-          <div class="field"><label>Correct answer</label><input class="input" name="correctAnswer" maxlength="20" value="${t.correctAnswer || ''}" placeholder="e.g. D"></div>
+          <div class="field"><label>Correct answer</label><input class="input" name="correctAnswer" maxlength="20" value="${t.correctAnswer ?? (k ? k.answer : '')}" placeholder="e.g. D"></div>
         </div>
         <div class="field"><label>Note</label><input class="input" name="note" maxlength="300" value="${t.note || ''}" placeholder="One line on what happened"></div>
       </div>
@@ -834,17 +844,18 @@ async function persist() {
   const misses = markedKeys().map((key) => {
     const [section, q] = key.split(':');
     const t = draft.tags[key] || {};
+    const k = keyed() ? keyFor(draft.sourceId, section, q) : null;
     return {
       id: t.missId || store.newId('miss'),
       section,
       questionNumber: Number(q),
-      topic: t.topic || '',
+      topic: t.topic || (k && k.topic) || '',
       cause: t.cause || 'content',
       guessedRight: draft.marks[section][q] === 'guess',
-      unscored: keyed() ? Boolean((keyFor(draft.sourceId, section, q) || {}).unscored) : false,
+      unscored: Boolean(k && k.unscored),
       note: t.note || '',
       myAnswer: t.myAnswer || '',
-      correctAnswer: t.correctAnswer || '',
+      correctAnswer: t.correctAnswer ?? (k ? k.answer : ''),
       fixLine: t.fixLine || '',
       createdAt: t.createdAt || store.nowISO(),
       explanation: t.explanation || null,

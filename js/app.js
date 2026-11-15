@@ -4,6 +4,7 @@ import * as store from './store.js';
 import { icon, toast } from './ui.js';
 import { dueRedos } from './logic/redo.js';
 import { startSync } from './sync.js';
+import * as booklets from './booklets.js';
 
 import * as today from './views/today.js';
 import * as plan from './views/plan.js';
@@ -169,6 +170,7 @@ async function boot() {
     return;
   }
   store.subscribe(rerender);
+  booklets.loadStatus();
   startSync();
   let reloadTimer = null;
   store.db.onOtherTabWrite(() => {

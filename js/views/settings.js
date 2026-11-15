@@ -11,6 +11,8 @@ import { addTestSheet, removeTest } from './add-test.js';
 import { validateImport } from '../db.js';
 import { syncNow, createSyncSpace, joinSync, disableSync } from '../sync.js';
 import { formatSyncCode } from '../logic/sync.js';
+import * as booklets from '../booklets.js';
+import { BOOKLETS } from '../data/forms.js';
 
 export const live = true;
 
@@ -116,6 +118,7 @@ export function render(el) {
 
       <section class="stack" id="materials">
         <div class="section-title"><h2>Materials</h2></div>
+        <div class="list" data-booklets>${bookletRows()}</div>
         <div class="list">
           ${(s.customMaterials || []).map((c) => {
             const usedBy = store.state.attempts.filter((a) => a.sourceId === c.sourceId).length;
@@ -219,6 +222,24 @@ export function render(el) {
   );
 
   bind(el);
+  return booklets.onChange(() => {
+    const box = el.querySelector('[data-booklets]');
+    if (box) setHTML(box, bookletRows());
+  });
+}
+
+/** One row per official practice test: attach its booklet once, then it syncs to linked devices. */
+function bookletRows() {
+  return html`${Object.keys(BOOKLETS).map((id) => {
+    const title = `Official Practice Test ${id.split('-')[1]}`;
+    const st = booklets.statusOf(id);
+    const line = st === 'downloading' ? 'Downloading booklet' : st === 'uploading' ? 'Booklet attached, uploading' : st === 'attached' ? 'Booklet attached' : 'No booklet yet';
+    return html`<div class="list-item"><span class="list-icon">${icon(st === 'attached' ? 'check' : 'tests')}</span>
+      <div class="grow"><div class="strong">${title}</div><div class="small muted">${line}</div></div>
+      ${st
+        ? ''
+        : html`<label class="btn btn-secondary btn-sm file-btn">Attach booklet<input type="file" accept="application/pdf,.pdf" data-booklet-file="${id}"></label>`}</div>`;
+  })}`;
 }
 
 function ago(iso) {
@@ -463,6 +484,22 @@ function bind(el) {
       entry[t.dataset.field] = value;
       all[t.dataset.legacy] = entry;
       return save({ legacyTests: all }, true, 'Saved. The planner can use this test now.');
+    }
+    if (t.dataset.bookletFile) {
+      const file = t.files && t.files[0];
+      t.value = '';
+      if (!file) return;
+      const label = t.closest('label');
+      if (label) label.classList.add('is-busy');
+      try {
+        const msg = await booklets.attach(t.dataset.bookletFile, file);
+        toast(msg || 'Booklet attached.');
+      } catch (err) {
+        reportError(err, "Couldn't attach that booklet. Try again.");
+      } finally {
+        if (label) label.classList.remove('is-busy');
+      }
+      return;
     }
     if (t.hasAttribute('data-guide-owned')) return save({ prepGuide: { ...s.prepGuide, owned: t.checked } });
     if (t.hasAttribute('data-import')) {
