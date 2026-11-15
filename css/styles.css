@@ -727,3 +727,7 @@ summary { cursor: pointer; min-height: 32px; display: list-item; }
 .bk-zoom-body { flex: 1; overflow: auto; touch-action: none; background: var(--surface-2); }
 .bk-zoom-canvas { display: block; height: auto; background: #fff; }
 .is-busy { opacity: 0.6; pointer-events: none; }
+
+.review-reveal { display: block; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; border: 1.5px dashed var(--border); }
+.review-reveal[aria-expanded='true'] { border-style: solid; border-color: var(--success); }
+.review-reveal[aria-expanded='false'] [data-answer-text] { color: var(--muted); font-weight: 600; }

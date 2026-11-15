@@ -4,6 +4,8 @@
 import * as db from './db.js';
 import * as store from './store.js';
 import { BOOKLETS } from './data/forms.js';
+import { parseChoices } from './logic/choices.js';
+export { matchChoice } from './logic/choices.js';
 
 const PDFJS = new URL('../vendor/pdfjs/pdf.min.js', import.meta.url).href;
 const PDFJS_WORKER = new URL('../vendor/pdfjs/pdf.worker.min.js', import.meta.url).href;
@@ -240,4 +242,38 @@ export async function renderPage(sourceId, pageNumber, width) {
   canvas.height = Math.floor(viewport.height);
   await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
   return canvas;
+}
+
+/**
+ * The answer choices of question q, read from the booklet text on its page (and the next page, when
+ * the choices run over). Returns [{ letter: 'A'..'D', text }] in order, or null when they can't be
+ * found. The booklet prints F, G, H, J on even questions; letters come back as A to D.
+ */
+export async function choicesFor(sourceId, page, q) {
+  const doc = await docFor(sourceId);
+  if (!doc || !page) return null;
+  const words = [];
+  for (const p of [page, page + 1]) {
+    if (p > doc.numPages) break;
+    const pg = await doc.getPage(p);
+    const vp = pg.getViewport({ scale: 1 });
+    for (const it of (await pg.getTextContent()).items) {
+      if (typeof it.str !== 'string' || !it.str.trim()) continue;
+      const x = it.transform[4];
+      const y = vp.height - it.transform[5];
+      if (y < 40 || y > vp.height - 50) continue; // header and footer
+      words.push({ p, col: x < vp.width / 2 ? 0 : 1, y, x, s: it.str });
+    }
+  }
+  words.sort((a, b) => a.p - b.p || a.col - b.col || a.y - b.y || a.x - b.x);
+  // Mark where the text jumps to another column or page, or skips down, so a choice ends there.
+  let text = ' ';
+  let prev = null;
+  for (const w of words) {
+    if (prev && (w.p !== prev.p || w.col !== prev.col || w.y - prev.y > 16)) text += ' ¶ ';
+    text += `${w.s} `;
+    prev = w;
+  }
+  text = text.replace(/\s+/g, ' ');
+  return parseChoices(text, q);
 }

@@ -13,7 +13,7 @@ import { topicPicker, causePicker, promptNewTopic } from './miss-form.js';
 import { addTestSheet } from './add-test.js';
 import { importResultsSheet } from './import-results.js';
 import { bookletPanel, mountBooklet } from './booklet-view.js';
-import { onChange as onBookletChange } from '../booklets.js';
+import { onChange as onBookletChange, hasBooklet, choicesFor, matchChoice } from '../booklets.js';
 import { parseResults, splitSections, checkResults } from '../logic/results-import.js';
 
 export const live = false;
@@ -27,6 +27,10 @@ let draft = null;
 // lives in memory only: never in the draft, the saved miss, exports, or sync.
 let hints = { sourceId: null, bySection: {} };
 let importNotice = '';
+// Tag cards where the correct answer was tapped open. Memory only.
+const shownAnswers = new Set();
+// Answer choices read from the attached booklet, by "sourceId:section:q". Memory only.
+const choiceCache = new Map();
 
 function hintFor(section, q) {
   if (hints.sourceId !== draft.sourceId) return null;
@@ -37,6 +41,8 @@ function hintFor(section, q) {
 function forgetImport() {
   hints = { sourceId: null, bySection: {} };
   importNotice = '';
+  shownAnswers.clear();
+  choiceCache.clear();
 }
 
 function blankDraft(query) {
@@ -232,10 +238,22 @@ export function render(el, ctx) {
         </div>`,
     );
     mountBooklet(el);
+    fillReview(el);
     saveDraft();
   };
 
   el.addEventListener('click', async (e) => {
+    const rv = e.target.closest('[data-reveal-answer]');
+    if (rv) {
+      const id = `${draft.sourceId}:${rv.dataset.revealAnswer}`;
+      const [sec, num] = rv.dataset.revealAnswer.split(':');
+      const k = keyFor(draft.sourceId, sec, num);
+      if (shownAnswers.has(id)) shownAnswers.delete(id);
+      else shownAnswers.add(id);
+      const box = rv.closest('[data-review]');
+      if (box && k) setHTML(box, reviewInner(rv.dataset.revealAnswer, hintFor(sec, num), draft.tags[rv.dataset.revealAnswer] || {}, k));
+      return;
+    }
     const b = e.target.closest('[data-action], [data-kind], [data-sec-tab], [data-topic], [data-topic-new], [data-cause], [data-step-pacing]');
     if (!b) return;
     if (b.dataset.kind) {
@@ -714,6 +732,47 @@ function countText(missCount, guessCount) {
   return `${missCount} missed${guessCount ? `, ${guessCount} guessed` : ''}`;
 }
 
+/** What you answered, and the correct answer covered until tapped: a quick review while tagging. */
+function reviewBox(key, hint, t, k) {
+  if (!k || !k.answer) return '';
+  return html`<div class="grid-2 review-box" data-review="${key}">${reviewInner(key, hint, t, k)}</div>`;
+}
+
+function reviewInner(key, hint, t, k) {
+  const choices = choiceCache.get(`${draft.sourceId}:${key}`) || null;
+  const said = (hint && hint.answer) || t.myAnswer || '';
+  const mine = matchChoice(choices, said);
+  const right = choices ? choices.find((c) => c.letter === k.answer) : null;
+  const shown = shownAnswers.has(`${draft.sourceId}:${key}`);
+  return html`<div class="card card-soft card-tight"><div class="tiny muted strong">YOU ANSWERED</div>
+      <div class="strong">${mine ? `${mine.letter}. ${mine.text}` : said || 'Not recorded'}</div></div>
+    <button type="button" class="card card-soft card-tight review-reveal" data-reveal-answer="${key}" aria-expanded="${shown}">
+      <div class="tiny muted strong">CORRECT</div>
+      <div class="strong" data-answer-text>${shown ? (right ? `${right.letter}. ${right.text}` : k.answer) : 'Tap to show'}</div>
+    </button>`;
+}
+
+/** Fill in the review box with the choice text from the attached booklet, once it's read. */
+async function fillReview(el) {
+  const box = el.querySelector('[data-review]');
+  if (!box || !draft || !hasBooklet(draft.sourceId)) return;
+  const key = box.dataset.review;
+  const id = `${draft.sourceId}:${key}`;
+  const [s, q] = key.split(':');
+  const k = keyFor(draft.sourceId, s, q);
+  if (!k) return;
+  if (!choiceCache.has(id)) {
+    try {
+      choiceCache.set(id, await choicesFor(draft.sourceId, k.page, Number(q)));
+    } catch (e) {
+      console.error('Could not read choices', e);
+      choiceCache.set(id, null);
+    }
+  }
+  if (!box.isConnected || !draft) return;
+  setHTML(box, reviewInner(key, hintFor(s, q), draft.tags[key] || {}, k));
+}
+
 function stepTag() {
   const keys = markedKeys();
   if (!keys.length) return html`<div class="empty"><h3>No questions marked</h3><p>Go back to mark misses, or save the test now.</p><button class="btn" data-action="save">Save test</button></div>`;
@@ -734,12 +793,11 @@ function stepTag() {
     <div class="tag-head sec-${s}">
       <div class="qnum">${q}</div>
       <div class="grow"><div class="strong">${SECTIONS[s].label}, question ${q}</div><div class="small muted">${sub.join('. ')}</div></div>
-      ${k ? html`<div class="key-tags">${k.unscored ? html`<span class="badge badge-muted">Not scored</span>` : ''}<span class="badge">Key: ${k.answer}</span></div>` : ''}
+      ${k && k.unscored ? html`<div class="key-tags"><span class="badge badge-muted">Not scored</span></div>` : ''}
     </div>
     ${k ? bookletPanel(draft.sourceId, s, q, k) : ''}
-    ${hint && (hint.text || hint.answer)
-      ? html`<div class="q-hint">${hint.text ? html`<p class="q-hint-text">${hint.text}</p>` : ''}${hint.answer ? html`<p class="small muted">Your answer: ${hint.answer}</p>` : ''}</div>`
-      : ''}
+    ${hint && hint.text ? html`<div class="q-hint"><p class="q-hint-text">${hint.text}</p></div>` : ''}
+    ${reviewBox(key, hint, t, k)}
     <div class="field"><span class="label">Topic${k && k.category ? html` <span class="hint">Key category: ${CATEGORY_NAMES[k.category] || k.category}</span>` : ''}</span>${topicPicker(s, t.topic || (k && k.topic) || '', store.state.settings.customTopics, likely)}</div>
     <div class="field"><span class="label">${guessed ? 'Why were you unsure?' : 'Why did you miss it?'}</span>${causePicker(t.cause)}</div>
     <details ${t.note || t.myAnswer || (t.correctAnswer && (!k || t.correctAnswer !== k.answer)) ? html`open` : ''}>
