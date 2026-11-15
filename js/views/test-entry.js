@@ -239,6 +239,7 @@ export function render(el, ctx) {
     );
     mountBooklet(el);
     fillReview(el);
+    centerTagStrip(el);
     saveDraft();
   };
 
@@ -254,7 +255,7 @@ export function render(el, ctx) {
       if (box && k) setHTML(box, reviewInner(rv.dataset.revealAnswer, hintFor(sec, num), draft.tags[rv.dataset.revealAnswer] || {}, k));
       return;
     }
-    const b = e.target.closest('[data-action], [data-kind], [data-sec-tab], [data-topic], [data-topic-new], [data-cause], [data-step-pacing]');
+    const b = e.target.closest('[data-action], [data-kind], [data-sec-tab], [data-topic], [data-topic-new], [data-cause], [data-step-pacing], [data-tag-go]');
     if (!b) return;
     if (b.dataset.kind) {
       draft.kind = b.dataset.kind;
@@ -305,7 +306,15 @@ export function render(el, ctx) {
     if (b.dataset.cause) {
       currentTag().cause = b.dataset.cause;
       el.querySelectorAll('[data-cause]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      const chip = el.querySelector(`[data-tag-go="${draft.tagIndex}"]`);
+      if (chip) chip.classList.add('done');
       saveDraft();
+      return;
+    }
+    if (b.dataset.tagGo !== undefined) {
+      readTagText(el);
+      draft.tagIndex = Number(b.dataset.tagGo);
+      draw();
       return;
     }
     const action = b.dataset.action;
@@ -778,6 +787,29 @@ async function fillReview(el) {
   setHTML(box, reviewInner(key, hintFor(s, q), draft.tags[key] || {}, k));
 }
 
+/** Every marked question in a scrollable row: section color and letter, tagged, not scored, current. */
+function tagStrip(keys, current) {
+  if (keys.length < 2) return '';
+  return html`<div class="tag-strip" role="list" aria-label="Missed questions">
+    ${keys.map((key, j) => {
+      const [s, q] = key.split(':');
+      const k = keyed() ? keyFor(draft.sourceId, s, q) : null;
+      const done = Boolean((draft.tags[key] || {}).cause);
+      const uns = Boolean(k && k.unscored);
+      const label = `${SECTIONS[s].label} question ${q}${uns ? ', not scored' : ''}${done ? ', tagged' : ''}`;
+      return html`<button type="button" role="listitem" class="ts sec-${s}${done ? ' done' : ''}${uns ? ' uns' : ''}" data-tag-go="${j}" aria-current="${j === current}" aria-label="${label}"><span class="ts-sec">${SECTIONS[s].short}</span>${q}</button>`;
+    })}
+  </div>`;
+}
+
+/** Scroll the strip so the current question is in view, without moving the page. */
+function centerTagStrip(el) {
+  const strip = el.querySelector('.tag-strip');
+  const cur = strip && strip.querySelector('[aria-current="true"]');
+  if (!cur) return;
+  strip.scrollLeft = cur.offsetLeft - strip.clientWidth / 2 + cur.offsetWidth / 2;
+}
+
 function stepTag() {
   const keys = markedKeys();
   if (!keys.length) return html`<div class="empty"><h3>No questions marked</h3><p>Go back to mark misses, or save the test now.</p><button class="btn" data-action="save">Save test</button></div>`;
@@ -795,6 +827,7 @@ function stepTag() {
   if (guessed) sub.push('Guessed right, counts at half weight');
   else if (k && k.unscored) sub.push('Counts at half weight');
   return html`<div class="stack-lg" data-tag-card>
+    ${tagStrip(keys, i)}
     <div class="tag-head sec-${s}">
       <div class="qnum">${q}</div>
       <div class="grow"><div class="strong">${SECTIONS[s].label}, question ${q}</div><div class="small muted">${sub.join('. ')}</div></div>
