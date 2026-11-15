@@ -770,9 +770,15 @@ summary { cursor: pointer; min-height: 32px; display: list-item; }
 .lesson-summary { background: var(--sec-soft); border-color: transparent; }
 .lesson-summary p { font-weight: 600; }
 .lesson-list, .lesson-steps { margin: 0; padding-left: 20px; display: grid; gap: 8px; line-height: 1.5; }
-.lesson-choices { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.lesson-choices li { padding: 8px 12px; border-radius: 10px; background: var(--surface-2); }
-.lesson-choices li.is-answer { background: var(--success-soft); color: var(--success); font-weight: 650; }
+.lesson-choices { display: grid; gap: 8px; }
+.lesson-choice { display: block; width: 100%; min-height: var(--tap); padding: 10px 14px; border-radius: 12px; border: 1.5px solid var(--border);
+  background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.lesson-choice:not(:disabled):active { transform: scale(0.99); }
+.lesson-choice:disabled { cursor: default; opacity: 1; }
+.lesson-choice.is-answer { background: var(--success-soft); border-color: var(--success); color: var(--success); font-weight: 650; }
+.lesson-choice.is-wrong { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
+.text-success { color: var(--success); }
+.text-danger { color: var(--danger); }
 .lesson-prompt { font-size: 1rem; }
 .lesson-prompt u { text-decoration-thickness: 2px; text-underline-offset: 3px; }
 .check-q { display: block; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; }

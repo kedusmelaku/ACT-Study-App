@@ -13,6 +13,8 @@ export const live = true;
 let activeSection = 'english';
 // Revealed examples and check answers, by "section|topic|part". Memory only.
 const shown = new Set();
+// The choice tapped on each worked example, by "section|topic". Memory only.
+const picks = new Map();
 
 /** Text with [[...]] shown underlined (the part an English question asks about). */
 function rich(text) {
@@ -123,6 +125,8 @@ function renderTopic(el, ctx, section, slug) {
   const misses = missesFor(section, topic);
   const st = studiedOn(section, topic);
   const exShown = shown.has(key('example'));
+  const pick = picks.get(`${section}|${topic}`) || null;
+  const letterOf = (c) => c.slice(0, 1);
 
   setHTML(
     el,
@@ -143,10 +147,19 @@ function renderTopic(el, ctx, section, slug) {
         <section class="card stack">
           <div class="spread"><h2>Worked example</h2><span class="small muted">Try it first</span></div>
           <p class="lesson-prompt">${rich(l.example.prompt)}</p>
-          <ul class="lesson-choices">${l.example.choices.map((c) => html`<li class="${exShown && c.startsWith(`${l.example.answer}.`) ? 'is-answer' : ''}">${c}</li>`)}</ul>
+          <div class="lesson-choices" role="group" aria-label="Answer choices">
+            ${l.example.choices.map((c) => {
+              const L = letterOf(c);
+              const cls = exShown ? (L === l.example.answer ? 'is-answer' : L === pick ? 'is-wrong' : '') : '';
+              return html`<button type="button" class="lesson-choice ${cls}" data-pick="${L}" ${exShown ? html`disabled` : ''} aria-pressed="${L === pick}">${c}</button>`;
+            })}
+          </div>
           ${exShown
-            ? html`<div class="stack-sm"><div class="strong">Answer: ${l.example.answer}</div><ol class="lesson-steps">${l.example.steps.map((x) => html`<li>${x}</li>`)}</ol></div>`
-            : html`<button type="button" class="btn btn-secondary btn-block" data-show="example">${icon('eye')}Show the answer and steps</button>`}
+            ? html`<div class="stack-sm">
+                <div class="strong ${pick ? (pick === l.example.answer ? 'text-success' : 'text-danger') : ''}">${pick ? (pick === l.example.answer ? `Right, it's ${l.example.answer}.` : `Not quite. You picked ${pick}, and the answer is ${l.example.answer}.`) : `Answer: ${l.example.answer}`}</div>
+                <ol class="lesson-steps">${l.example.steps.map((x) => html`<li>${x}</li>`)}</ol>
+              </div>`
+            : html`<button type="button" class="btn btn-ghost btn-block" data-show="example">Not sure? Show the answer</button>`}
         </section>
 
         <section class="stack">
@@ -200,6 +213,15 @@ function renderTopic(el, ctx, section, slug) {
   );
 
   el.addEventListener('click', async (e) => {
+    const pk = e.target.closest('[data-pick]');
+    if (pk && !pk.disabled) {
+      picks.set(`${section}|${topic}`, pk.dataset.pick);
+      shown.add(key('example'));
+      const y = window.scrollY;
+      renderTopic(replace(el), ctx, section, slug);
+      window.scrollTo(0, y);
+      return;
+    }
     const sh = e.target.closest('[data-show]');
     if (sh) {
       const k = key(sh.dataset.show);
