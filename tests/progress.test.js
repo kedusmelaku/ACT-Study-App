@@ -36,3 +36,16 @@ test('coach stats carry numbers and labels only, never notes or question text', 
   assert.ok(stats.sections.reading.estimate);
   assert.equal(stats.topTopics[0].topic, 'Inference');
 });
+
+test('chart places scores out of 35 at their 36-scale spot', () => {
+  const s = trendSeries([
+    { id: 'b', date: '2026-10-01', kind: 'benchmark', scale: 35, scores: { english: 35, reading: 33 } },
+    { id: 'p', date: '2026-11-14', kind: 'official_enhanced', scale: 36, scores: { english: 35, reading: 33 } },
+  ]);
+  assert.equal(s[0].plot.english, 36);
+  assert.ok(Math.abs(s[0].plot.reading - 33.94) < 0.01);
+  assert.equal(s[0].scores.reading, 33);
+  assert.equal(s[1].plot.reading, 33);
+  // Same numbers on a bigger scale read as a drop, not as no change.
+  assert.ok(s[1].plot.reading < s[0].plot.reading);
+});

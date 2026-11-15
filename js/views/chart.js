@@ -17,7 +17,7 @@ export function trendChart(series, { wide = false } = {}) {
   const n = series.length;
   const values = [];
   for (const p of series) {
-    for (const s of ALL_SECTIONS) if (p.scores[s]) values.push(p.scores[s]);
+    for (const s of ALL_SECTIONS) if (p.plot[s]) values.push(p.plot[s]);
     if (p.estComposite) values.push(p.estComposite);
   }
   let lo = Math.min(...values) - 1;
@@ -52,7 +52,7 @@ export function trendChart(series, { wide = false } = {}) {
 
   const ends = [];
   for (const s of ALL_SECTIONS) {
-    const pts = series.map((p, i) => (p.scores[s] ? [x(i), y(p.scores[s])] : null));
+    const pts = series.map((p, i) => (p.plot[s] ? [x(i), y(p.plot[s])] : null));
     if (!pts.some(Boolean)) continue;
     out += `<g class="series" style="--c:var(--chart-${s})"><path d="${pathFor(pts)}" style="stroke:var(--c)"/>`;
     series.forEach((p, i) => {
@@ -60,13 +60,16 @@ export function trendChart(series, { wide = false } = {}) {
       const [cx, cy] = pts[i];
       if (p.real) {
         out += `<rect x="${fmt(cx - 5.5)}" y="${fmt(cy - 5.5)}" width="11" height="11" transform="rotate(45 ${fmt(cx)} ${fmt(cy)})" style="fill:var(--c);stroke:var(--surface);stroke-width:2"/>`;
+      } else if (p.scale === 35) {
+        // Hollow: a score out of 35, drawn at its place on the 36 scale.
+        out += `<circle cx="${fmt(cx)}" cy="${fmt(cy)}" r="4" style="fill:var(--surface);stroke:var(--c);stroke-width:2.5"/>`;
       } else {
         out += `<circle cx="${fmt(cx)}" cy="${fmt(cy)}" r="4.5" style="fill:var(--c);stroke:var(--surface);stroke-width:2"/>`;
       }
     });
     out += '</g>';
     const last = [...series.keys()].reverse().find((i) => pts[i]);
-    ends.push({ s, y: pts[last][1], v: series[last].scores[s] });
+    ends.push({ s, y: pts[last][1], v: `${series[last].scores[s]}${series[last].scale === 35 ? '/35' : ''}` });
   }
   // Direct labels at the right edge, nudged apart so they never overlap.
   ends.sort((a, b) => a.y - b.y);
@@ -89,6 +92,7 @@ export function trendChart(series, { wide = false } = {}) {
     <span><svg width="18" height="8" aria-hidden="true"><line x1="0" x2="18" y1="4" y2="4" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"/></svg>Est. composite</span>
     <span><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="2.5" y="2.5" width="7" height="7" transform="rotate(45 6 6)" fill="currentColor"/></svg>Real ACT</span>
     <span><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="currentColor"/></svg>Practice</span>
+    ${series.some((p) => p.scale === 35) ? html`<span><svg width="10" height="10" aria-hidden="true"><circle cx="5" cy="5" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>Out of 35, on the 36 scale</span>` : ''}
   </div>`;
 
   const table = html`<details><summary class="small strong">Show as a table</summary>

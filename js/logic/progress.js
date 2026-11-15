@@ -23,6 +23,9 @@ export function trendSeries(attempts) {
       real: a.kind === 'real',
       scale: Number(a.scale) === 35 ? 35 : 36,
       scores: { ...a.scores },
+      // Where to draw each score on the chart: scores out of 35 are placed at their 36-scale
+      // equivalent (score x 36/35), so a change of scale doesn't look like a change in score.
+      plot: Object.fromEntries(Object.entries(a.scores).filter(([, v]) => Number.isFinite(v)).map(([s, v]) => [s, Number(a.scale) === 35 ? (v * 36) / 35 : v])),
       composite: compositeOf(a.scores),
       estComposite: estimatedComposite(estimates(upTo)),
     };
