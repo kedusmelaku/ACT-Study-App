@@ -5,6 +5,7 @@ import { icon, toast } from './ui.js';
 import { dueRedos } from './logic/redo.js';
 import { startSync } from './sync.js';
 import * as booklets from './booklets.js';
+import { initPullRefresh } from './pull-refresh.js';
 
 import * as today from './views/today.js';
 import * as plan from './views/plan.js';
@@ -172,6 +173,7 @@ async function boot() {
   store.subscribe(rerender);
   booklets.loadStatus();
   startSync();
+  initPullRefresh();
   let reloadTimer = null;
   store.db.onOtherTabWrite(() => {
     clearTimeout(reloadTimer);
