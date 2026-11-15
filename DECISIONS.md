@@ -192,3 +192,5 @@ Judgment calls made without asking. One line each: what, then why.
 - Imported answers for missed questions are kept in the logger's draft, so a reload mid-tagging doesn't lose them. The question's first line is still kept in memory only.
 - Matching a results-page answer to a booklet choice normalizes characters (math italic letters), then falls back to comparing letters only (subscripts land in different places in the two files), accepting that only when exactly one choice fits.
 - The redo screen's Reveal and the Explain form show answers as "D. So far," when the text is known.
+- Added "Writer's purpose" as a built-in English topic for "Suppose the writer's purpose had been... Would this essay accomplish that purpose?" questions, which judge the whole essay or paragraph instead of adding, deleting, or revising a part. Tests 2 to 4 have nine of them (Test 1 has none), now tagged with it in forms.js. It's a Production of Writing topic.
+- Misses already saved on those questions with "Add, delete, or revise" move to "Writer's purpose" once (topicFixes in settings records it), so a topic chosen by hand later is left alone.

@@ -156,8 +156,30 @@ export async function init() {
   if (!stored) await db.put('settings', state.settings);
   state.ready = true;
   await dropDuplicateTests();
+  await applyTopicFixes();
   await ensureWeek();
   emit();
+}
+
+/**
+ * One-time topic updates to misses saved before a built-in topic changed. Each runs once (recorded in
+ * settings), so a topic picked by hand afterward is never changed back.
+ * writers-purpose: "Suppose the writer's purpose had been..." questions moved from "Add, delete, or
+ * revise" to the new "Writer's purpose" topic.
+ */
+async function applyTopicFixes() {
+  const done = state.settings.topicFixes || [];
+  if (done.includes('writers-purpose')) return;
+  const ops = [];
+  state.misses = state.misses.map((m) => {
+    const k = m.sourceId && m.questionNumber ? keyFor(m.sourceId, m.section, m.questionNumber) : null;
+    if (!k || k.topic !== "Writer's purpose" || m.topic !== 'Add, delete, or revise') return m;
+    const next = { ...m, topic: k.topic };
+    ops.push({ store: 'misses', type: 'put', value: next });
+    return next;
+  });
+  if (ops.length) await db.batch(ops);
+  await saveSettings({ topicFixes: [...done, 'writers-purpose'] });
 }
 
 /**

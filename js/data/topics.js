@@ -17,6 +17,7 @@ export const DEFAULT_TOPICS = Object.freeze({
     'Transitions',
     'Add, delete, or revise',
     'Organization and sentence order',
+    "Writer's purpose",
   ]),
   math: Object.freeze([
     'Number and quantity',

@@ -133,7 +133,7 @@ README.md
 
 The user can add custom topics per section. Defaults:
 
-- **English:** commas; semicolons and colons; dashes and parentheses; apostrophes; sentence boundaries (fragments, run-ons); subject-verb agreement; pronoun agreement and case; verb tense; modifiers; parallelism; word choice and idioms; concision and redundancy; transitions; add, delete, or revise (rhetorical purpose); organization and sentence order.
+- **English:** commas; semicolons and colons; dashes and parentheses; apostrophes; sentence boundaries (fragments, run-ons); subject-verb agreement; pronoun agreement and case; verb tense; modifiers; parallelism; word choice and idioms; concision and redundancy; transitions; add, delete, or revise (rhetorical purpose); organization and sentence order; writer's purpose (whether the essay or paragraph accomplishes a stated purpose).
 - **Math:** number and quantity; linear equations and systems; quadratics and polynomials; functions; exponents and logarithms; plane geometry; coordinate geometry; conic sections; trigonometry and the unit circle; statistics; probability and counting; matrices; complex numbers; vectors; sequences; word problems and modeling.
 - **Reading:** main idea; detail; inference; vocabulary in context; author purpose and tone; function of a part; comparing paired passages; data or graphs in reading.
 - **Science:** data representation; research summaries; conflicting viewpoints; graph reading; trends and extrapolation; experimental design; outside knowledge.

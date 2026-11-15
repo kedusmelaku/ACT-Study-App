@@ -54,7 +54,7 @@ for (const [id, form] of Object.entries(FORMS)) {
 const ALLOWED = {
   english: {
     CSE: ['CM', 'SC', 'DP', 'AP', 'SB', 'SV', 'PR', 'VT', 'MO', 'PA'],
-    POW: ['TR', 'AD', 'OR'],
+    POW: ['TR', 'AD', 'OR', 'PU'],
     KLA: ['WC', 'CO', 'TR', 'PA'],
   },
   math: { G: ['PG', 'CG', 'CS', 'TG', 'VC'], S: ['ST', 'PB'], N: ['NQ', 'CX', 'MX', 'VC', 'EL', 'WP'] },
@@ -93,6 +93,7 @@ test('acceptance: Practice Test 3 topics land on the hand-tagged ones', () => {
   assert.equal(topic('english', 26), 'Subject-verb agreement');
   assert.equal(topic('english', 36), 'Subject-verb agreement');
   assert.equal(topic('english', 28), 'Add, delete, or revise');
+  assert.equal(topic('english', 20), "Writer's purpose");
   assert.equal(topic('english', 41), 'Commas');
   assert.equal(topic('math', 36), 'Number and quantity');
   assert.equal(topic('science', 34), 'Data representation');

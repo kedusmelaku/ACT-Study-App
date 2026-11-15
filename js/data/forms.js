@@ -21,7 +21,7 @@ export const TOPIC_CODES = {
     CM: 'Commas', SC: 'Semicolons and colons', DP: 'Dashes and parentheses', AP: 'Apostrophes',
     SB: 'Sentence boundaries', SV: 'Subject-verb agreement', PR: 'Pronoun agreement and case', VT: 'Verb tense',
     MO: 'Modifiers', PA: 'Parallelism', WC: 'Word choice and idioms', CO: 'Concision and redundancy',
-    TR: 'Transitions', AD: 'Add, delete, or revise', OR: 'Organization and sentence order',
+    TR: 'Transitions', AD: 'Add, delete, or revise', OR: 'Organization and sentence order', PU: "Writer's purpose",
   },
   math: {
     NQ: 'Number and quantity', LI: 'Linear equations and systems', QP: 'Quadratics and polynomials', FN: 'Functions',
@@ -89,7 +89,7 @@ export const FORMS = {
       answers: 'DCDDDCCCBAABCCBCBDDACBBBADBDCADCDACACDDDBAADBDCDAD',
       categories: 'KLA CSE CSE KLA POW CSE POW CSE POW POW CSE POW POW KLA CSE - - - - - - - - - - POW POW CSE CSE KLA CSE CSE KLA POW POW CSE CSE CSE POW POW POW KLA CSE POW POW CSE CSE KLA POW POW',
       table: [1, 2, 4, 5, 6, 7, 8, 9, 10, 10, 11, 11, 11, 12, 13, 14, 14, 15, 15, 16, 17, 18, 19, 20, 20, 21, 21, 22, 23, 23, 24, 25, 26, 27, 28, 30, 32, 34, 35, 35, 36],
-      topics: 'CO DP SB CO AD SV AD SB OR AD CM AD OR WC SC AD OR AP CO AD AD SC WC WC AD TR TR PR PR CO SB SV CO AD AD CM SB SB OR TR AD WC AP AD AD CM SV WC OR AD',
+      topics: 'CO DP SB CO AD SV AD SB OR PU CM AD OR WC SC AD OR AP CO AD AD SC WC WC AD TR TR PR PR CO SB SV CO AD PU CM SB SB OR TR AD WC AP AD PU CM SV WC OR PU',
       pages: [4, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 8, 8, 8, 8, 8, 9, 9, 9, 9, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13, 13, 14, 14, 14, 15, 15, 15],
       passagePages: [0, 0, 0, 4, 4, 4, 4, 4, 4, 4, 0, 0, 0, 6, 6, 0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 0, 0, 0, 0, 12, 12, 12, 12, 12, 12, 0, 0, 14, 14, 14],
     },
@@ -131,7 +131,7 @@ export const FORMS = {
       answers: 'AABDBDDCBBBDACDCDAACCCABCDCBBACDABCABACDABDBDCCDAB',
       categories: 'POW POW POW POW CSE KLA CSE POW CSE KLA - - - - - - - - - - CSE CSE POW POW CSE CSE CSE POW KLA POW POW POW KLA CSE POW CSE CSE POW CSE CSE CSE POW CSE POW KLA KLA CSE POW KLA POW',
       table: [1, 2, 4, 5, 6, 7, 8, 9, 10, 10, 11, 11, 11, 12, 13, 14, 14, 15, 15, 16, 17, 18, 19, 20, 20, 21, 21, 22, 23, 23, 24, 25, 26, 27, 28, 30, 32, 34, 35, 35, 36],
-      topics: 'AD TR AD TR SB CO SB TR CM WC CM CO SC AD TR PR PA TR WC AD SB VT AD OR SC SV PR AD TR AD AD AD TR DP AD SV AP AD MO SC CM TR CM AD WC TR SB AD CO AD',
+      topics: 'AD TR AD TR SB CO SB TR CM WC CM CO SC AD TR PR PA TR WC PU SB VT AD OR SC SV PR AD TR PU AD AD TR DP AD SV AP AD MO SC CM TR CM AD WC TR SB PU CO AD',
       pages: [4, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 10, 10, 10, 11, 11, 11, 11, 11, 12, 12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14, 14, 15, 15],
       passagePages: [0, 0, 0, 4, 4, 0, 0, 0, 5, 5, 0, 0, 0, 6, 6, 6, 6, 6, 6, 6, 0, 0, 8, 8, 8, 8, 8, 8, 8, 8, 0, 0, 0, 0, 0, 11, 11, 11, 11, 11, 0, 0, 0, 0, 13, 13, 13, 13, 13, 13],
     },
@@ -173,7 +173,7 @@ export const FORMS = {
       answers: 'BCADDCBDADCDBDACDBADADADCDCADBDADBCDACADBCDAACDACD',
       categories: 'POW CSE POW KLA CSE CSE CSE POW CSE POW CSE CSE POW KLA KLA POW CSE CSE CSE POW CSE KLA POW KLA POW POW POW KLA KLA CSE - - - - - - - - - - CSE POW POW CSE POW CSE CSE KLA POW POW',
       table: [1, 2, 4, 5, 6, 7, 8, 9, 10, 10, 11, 11, 11, 12, 13, 14, 14, 15, 15, 16, 17, 18, 19, 20, 20, 21, 21, 22, 23, 23, 24, 25, 26, 27, 28, 30, 32, 34, 35, 35, 36],
-      topics: 'AD DP AD CO SB SB PR TR AP AD SC VT TR PA CO AD PR PR CM TR SB CO AD WC AD TR AD WC CO SB SV AD CO WC SB SC SB TR OR AD CM AD AD PA AD SB PR WC AD AD',
+      topics: 'AD DP AD CO SB SB PR TR AP AD SC VT TR PA CO AD PR PR CM TR SB CO AD WC PU TR AD WC CO SB SV AD CO WC SB SC SB TR OR PU CM AD AD PA AD SB PR WC AD AD',
       pages: [4, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 9, 9, 9, 9, 10, 10, 10, 10, 10, 11, 11, 11, 12, 12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14, 14, 15, 15, 15, 15],
       passagePages: [0, 0, 0, 4, 4, 4, 4, 4, 4, 4, 0, 0, 6, 6, 6, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0, 0, 0, 0, 11, 11, 11, 11, 11, 11, 11, 0, 0, 13, 13, 13, 13, 13, 13, 13, 13],
     },
@@ -223,7 +223,7 @@ export const CATEGORY_NAMES = {
 export const CATEGORY_TOPICS = {
   english: {
     CSE: ['Commas', 'Semicolons and colons', 'Dashes and parentheses', 'Apostrophes', 'Sentence boundaries', 'Subject-verb agreement', 'Pronoun agreement and case', 'Verb tense', 'Modifiers', 'Parallelism'],
-    POW: ['Transitions', 'Add, delete, or revise', 'Organization and sentence order'],
+    POW: ['Transitions', 'Add, delete, or revise', 'Organization and sentence order', "Writer's purpose"],
     KLA: ['Word choice and idioms', 'Concision and redundancy', 'Transitions'],
   },
   math: {
