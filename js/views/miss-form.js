@@ -1,6 +1,8 @@
 // Quick-add and edit form for a single miss.
 import { html, setHTML } from '../safe-html.js';
 import { lessonLinks } from './learn.js';
+import { bookletPanel, mountBooklet } from './booklet-view.js';
+import { keyFor } from '../data/forms.js';
 import * as store from '../store.js';
 import { icon, topbar, reportError, undoToast, toast, openSheet } from '../ui.js';
 import { ALL_SECTIONS, SECTIONS, CAUSES, CAUSE_KEYS } from '../data/act.js';
@@ -228,11 +230,39 @@ function readText(root) {
   return out;
 }
 
+/** "D. So far," when both the letter and the choice text are known. */
+function answerLine(letter, text) {
+  if (letter && text) return `${letter}. ${text}`;
+  return letter || text || '';
+}
+
+/** The question itself: booklet page when attached, your answer, and the correct answer covered until tapped. */
+function questionCard(m) {
+  const k = m.sourceId && m.questionNumber ? keyFor(m.sourceId, m.section, m.questionNumber) : null;
+  const src = store.materials().find((x) => x.sourceId === m.sourceId);
+  const correct = m.correctAnswer || (k ? k.answer : '');
+  const mine = answerLine(m.myAnswer, m.myAnswerText);
+  if (!k && !mine && !correct) return '';
+  return html`<section class="card stack">
+    <div class="spread"><div class="strong">${src ? src.short || src.title : 'Your own source'}${m.questionNumber ? `, ${SECTIONS[m.section].label} question ${m.questionNumber}` : ''}</div>${m.unscored ? html`<span class="badge">Not scored</span>` : ''}</div>
+    ${k ? bookletPanel(m.sourceId, m.section, m.questionNumber, k) : ''}
+    <div class="grid-2 review-box">
+      <div class="card card-soft card-tight"><div class="tiny muted strong">YOU ANSWERED</div><div class="strong">${mine || 'Not recorded'}</div></div>
+      ${correct
+        ? html`<button type="button" class="card card-soft card-tight review-reveal" data-reveal-correct aria-expanded="false" data-answer="${answerLine(correct, m.correctAnswer ? m.correctAnswerText : '')}">
+            <div class="tiny muted strong">CORRECT</div><div class="strong" data-answer-text>Tap to show</div></button>`
+        : html`<div class="card card-soft card-tight"><div class="tiny muted strong">CORRECT</div><div class="strong">Not recorded</div></div>`}
+    </div>
+  </section>`;
+}
+
 export function render(el, ctx) {
   const id = ctx.params.id;
+  // Opened from a lesson: go back there instead of the error log.
+  const back = /^#\/learn\/[a-z]+\/[a-z0-9-]+$/.test(ctx.query.back || '') ? ctx.query.back : '#/log';
   const existing = id ? store.state.misses.find((m) => m.id === id) : null;
   if (id && !existing) {
-    setHTML(el, html`${topbar('Miss', { back: '#/log' })}<div class="empty"><h3>That miss isn't here</h3><p>It may have been deleted.</p><a class="btn" href="#/log">Back to the log</a></div>`);
+    setHTML(el, html`${topbar('Miss', { back })}<div class="empty"><h3>That miss isn't here</h3><p>It may have been deleted.</p><a class="btn" href="#/log">Back to the log</a></div>`);
     return;
   }
   const prefill = existing || {
@@ -241,13 +271,13 @@ export function render(el, ctx) {
   };
   setHTML(
     el,
-    html`${topbar(existing ? 'Edit miss' : 'Add a miss', {
-        back: '#/log',
+    html`${topbar(existing ? 'Miss' : 'Add a miss', {
+        back,
         eyebrow: existing ? 'Error log' : 'Drills, QuizMe, anything',
         actions: existing ? html`<a class="btn btn-sm btn-secondary" href="#/explain?miss=${existing.id}">${icon('explain')}Explain</a>` : '',
       })}
       ${existing && existing.explanation ? html`<details class="card card-soft mt"><summary class="strong">Claude's explanation</summary><p class="small explain-out mt">${existing.explanation}</p></details>` : ''}
-      ${existing ? html`<div class="mt">${lessonLinks(existing)}</div>` : ''}
+      ${existing ? html`<div class="stack mt">${questionCard(existing)}${lessonLinks(existing)}</div>` : ''}
       <div data-form class="mt"></div>
       ${existing ? html`<button class="btn btn-danger btn-block mt" data-action="delete">${icon('trash')}Delete miss</button>` : ''}`,
   );
@@ -262,6 +292,8 @@ export function render(el, ctx) {
         if (values.correctAnswer !== existing.correctAnswer) next.correctAnswerText = '';
         await store.updateMiss(next);
         toast('Saved.');
+        ctx.navigate(back);
+        return;
       } else {
         await store.addMiss({ ...values, sourceId: values.sourceId === 'other' ? null : values.sourceId });
         toast('Added. A redo is due in 3 days.');
@@ -269,11 +301,19 @@ export function render(el, ctx) {
       ctx.navigate('#/log');
     },
   });
+  mountBooklet(el);
   el.addEventListener('click', async (e) => {
+    const rv = e.target.closest('[data-reveal-correct]');
+    if (rv) {
+      const open = rv.getAttribute('aria-expanded') !== 'true';
+      rv.setAttribute('aria-expanded', String(open));
+      rv.querySelector('[data-answer-text]').textContent = open ? rv.dataset.answer : 'Tap to show';
+      return;
+    }
     if (!e.target.closest('[data-action=delete]')) return;
     try {
       const undo = await store.deleteMiss(existing.id);
-      ctx.navigate('#/log');
+      ctx.navigate(back);
       undoToast('Miss deleted.', undo);
     } catch (err) {
       reportError(err, "Couldn't delete that miss. Try again.");

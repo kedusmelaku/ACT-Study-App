@@ -191,7 +191,7 @@ function renderTopic(el, ctx, section, slug) {
           ${misses.length
             ? html`<div class="list">
                 ${misses.map(
-                  (m) => html`<a class="list-item" href="#/log/${m.id}">
+                  (m) => html`<a class="list-item" href="#/log/${m.id}?back=${encodeURIComponent(lessonHref(section, topic))}">
                     <span class="qnum-sm">${m.questionNumber || '?'}</span>
                     <div class="grow"><div class="strong">${sourceShort(m.sourceId)}${m.questionNumber ? `, question ${m.questionNumber}` : ''}</div>
                       <div class="row-wrap" style="margin-top:4px">${causeBadge(m.cause, m.guessedRight)}${m.unscored ? html`<span class="badge">Not scored</span>` : ''}<span class="small muted">${formatDate(m.date || String(m.createdAt).slice(0, 10), { weekday: false })}</span></div>
