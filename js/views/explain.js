@@ -37,8 +37,8 @@ function initForm(query) {
     section: m ? m.section : 'english',
     topic: m ? m.topic : '',
     description: m ? [m.questionNumber ? `Question ${m.questionNumber}` : '', m.note].filter(Boolean).join('. ') : '',
-    myAnswer: m ? m.myAnswer : '',
-    correctAnswer: m ? m.correctAnswer : '',
+    myAnswer: m ? [m.myAnswer, m.myAnswerText].filter(Boolean).join('. ') : '',
+    correctAnswer: m ? [m.correctAnswer, m.correctAnswer ? m.correctAnswerText : ''].filter(Boolean).join('. ') : '',
     myReasoning: '',
     image: null, // { mediaType, data, preview }, API mode only
     photoInChat: false, // chat mode: the photo gets attached in the Claude chat itself

@@ -53,8 +53,8 @@ export function render(el) {
       ${isRevealed
         ? html`<div class="stack-sm">
             <div class="grid-2">
-              <div class="card card-soft card-tight"><div class="tiny muted strong">YOUR OLD ANSWER</div><div class="strong">${m.myAnswer || 'Not recorded'}</div></div>
-              <div class="card card-soft card-tight"><div class="tiny muted strong">CORRECT</div><div class="strong">${correct || 'Not recorded'}</div></div>
+              <div class="card card-soft card-tight"><div class="tiny muted strong">YOUR OLD ANSWER</div><div class="strong">${answerLine(m.myAnswer, m.myAnswerText) || 'Not recorded'}</div></div>
+              <div class="card card-soft card-tight"><div class="tiny muted strong">CORRECT</div><div class="strong">${answerLine(correct, m.correctAnswer ? m.correctAnswerText : '') || 'Not recorded'}</div></div>
             </div>
             ${m.fixLine ? html`<div class="fix-line"><b>Fix</b>${m.fixLine}</div>` : html`<div class="fix-line muted">No fix line saved. <a href="#/log/${m.id}">Add one</a>.</div>`}
             ${m.note && m.questionNumber ? html`<p class="small muted">${m.note}</p>` : ''}
@@ -121,6 +121,12 @@ export function render(el) {
       reportError(err, "Couldn't save that answer. Try again.");
     }
   });
+}
+
+/** "D. So far," when both the letter and the choice text are known. */
+function answerLine(letter, text) {
+  if (letter && text) return `${letter}. ${text}`;
+  return letter || text || '';
 }
 
 function replace(el) {

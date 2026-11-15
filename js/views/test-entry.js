@@ -102,7 +102,7 @@ function draftFromAttempt(a) {
   for (const m of store.state.misses.filter((x) => x.attemptId === a.id)) {
     if (m.questionNumber) {
       d.marks[m.section][m.questionNumber] = m.guessedRight ? 'guess' : 'miss';
-      d.tags[`${m.section}:${m.questionNumber}`] = { missId: m.id, topic: m.topic, cause: m.cause, note: m.note, myAnswer: m.myAnswer, correctAnswer: m.correctAnswer, fixLine: m.fixLine, createdAt: m.createdAt, explanation: m.explanation };
+      d.tags[`${m.section}:${m.questionNumber}`] = { missId: m.id, topic: m.topic, cause: m.cause, note: m.note, myAnswer: m.myAnswer, saidText: m.myAnswerText || '', correctAnswer: m.correctAnswer, fixLine: m.fixLine, createdAt: m.createdAt, explanation: m.explanation };
     } else {
       d.extraMisses.push(m);
     }
@@ -453,8 +453,13 @@ export function render(el, ctx) {
     const marks = draft.marks[sec];
     p.results.forEach((r, i) => {
       const q = i + 1;
-      if (r === 'incorrect') marks[q] = 'miss';
-      else if (marks[q] === 'miss') delete marks[q];
+      if (r === 'incorrect') {
+        marks[q] = 'miss';
+        // Keep what you answered with the draft, so a reload doesn't lose it.
+        const said = p.questions[i] && p.questions[i].answer;
+        const tk = `${sec}:${q}`;
+        if (said) draft.tags[tk] = { ...(draft.tags[tk] || {}), saidText: said };
+      } else if (marks[q] === 'miss') delete marks[q];
     });
     if (draft.taken) draft.taken = { ...draft.taken, [sec]: true };
     draft.activeSection = sec;
@@ -740,7 +745,7 @@ function reviewBox(key, hint, t, k) {
 
 function reviewInner(key, hint, t, k) {
   const choices = choiceCache.get(`${draft.sourceId}:${key}`) || null;
-  const said = (hint && hint.answer) || t.myAnswer || '';
+  const said = (t.myAnswer || '').trim() || t.saidText || (hint && hint.answer) || '';
   const mine = matchChoice(choices, said);
   const right = choices ? choices.find((c) => c.letter === k.answer) : null;
   const shown = shownAnswers.has(`${draft.sourceId}:${key}`);
@@ -877,6 +882,40 @@ function bindGrid(el) {
 
 // ---------------------------------------------------------------- persist
 
+const TO_AD = { A: 'A', B: 'B', C: 'C', D: 'D', F: 'A', G: 'B', H: 'C', J: 'D' };
+
+/**
+ * The answers saved on a miss: your letter and that choice's text, and the correct letter and its
+ * text. Choice text comes from the attached booklet when there is one, otherwise your answer's text
+ * is what the results page showed.
+ */
+async function answersFor(key, t, k) {
+  const [section, q] = key.split(':');
+  const typed = (t.myAnswer || '').trim();
+  const said = t.saidText || (hintFor(section, q) || {}).answer || '';
+  let choices = null;
+  if (k && hasBooklet(draft.sourceId)) {
+    const id = `${draft.sourceId}:${key}`;
+    if (!choiceCache.has(id)) {
+      try {
+        choiceCache.set(id, await choicesFor(draft.sourceId, k.page, Number(q)));
+      } catch (e) {
+        console.error('Could not read choices', e);
+        choiceCache.set(id, null);
+      }
+    }
+    choices = choiceCache.get(id);
+  }
+  const letter = (v) => TO_AD[String(v).trim().toUpperCase()] || '';
+  // Something typed in "My answer" wins over the imported answer.
+  const picked = typed ? matchChoice(choices, typed) : matchChoice(choices, said);
+  const myAnswer = picked ? picked.letter : typed || letter(said);
+  const myAnswerText = picked ? picked.text : !typed && said && !letter(said) ? said : '';
+  const correctAnswer = t.correctAnswer ?? (k ? k.answer : '');
+  const right = choices ? choices.find((c) => c.letter === letter(correctAnswer)) : null;
+  return { myAnswer, myAnswerText, correctAnswer, correctAnswerText: right ? right.text : '' };
+}
+
 async function persist() {
   const id = draft.id || store.newId('att');
   const scores = {};
@@ -899,10 +938,11 @@ async function persist() {
   const pacing = Object.entries(draft.pacing)
     .filter(([s, p]) => scores[s] && p && (p.notReached || p.guessedAtEnd || p.minutesLeft))
     .map(([section, p]) => ({ section, notReached: p.notReached || 0, guessedAtEnd: p.guessedAtEnd || 0, minutesLeft: p.minutesLeft || 0 }));
-  const misses = markedKeys().map((key) => {
+  const misses = await Promise.all(markedKeys().map(async (key) => {
     const [section, q] = key.split(':');
     const t = draft.tags[key] || {};
     const k = keyed() ? keyFor(draft.sourceId, section, q) : null;
+    const answers = await answersFor(key, t, k);
     return {
       id: t.missId || store.newId('miss'),
       section,
@@ -912,13 +952,12 @@ async function persist() {
       guessedRight: draft.marks[section][q] === 'guess',
       unscored: Boolean(k && k.unscored),
       note: t.note || '',
-      myAnswer: t.myAnswer || '',
-      correctAnswer: t.correctAnswer ?? (k ? k.answer : ''),
+      ...answers,
       fixLine: t.fixLine || '',
       createdAt: t.createdAt || store.nowISO(),
       explanation: t.explanation || null,
     };
-  });
+  }));
   for (const m of draft.extraMisses || []) misses.push(m);
   await store.saveAttempt({ attempt, pacing, misses });
   return id;

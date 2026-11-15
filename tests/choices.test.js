@@ -32,3 +32,13 @@ test('choices: a choice ends where the text jumps to another column', () => {
   const t = ' 6. Pretend? F. No Change G. one H. two J. three, ¶ 7 Made-up passage text continues here. 7. Next? A. a B. b C. c D. d ';
   assert.equal(parseChoices(t, 6)[3].text, 'three,');
 });
+
+test('choices: math italic letters and moved subscripts still match, numbers alone do not', () => {
+  const math = [{ letter: 'A', text: 'a = b' }, { letter: 'B', text: 'a > b' }, { letter: 'C', text: 'x' }, { letter: 'D', text: 'y' }];
+  assert.equal(matchChoice(math, '𝑎 = 𝑏').letter, 'A');
+  const sub = [{ letter: 'A', text: 'at the made-up BP for H O at 1 atm. 2' }, { letter: 'B', text: 'above the made-up BP for H O at 2 1 atm.' }, { letter: 'C', text: 'c' }, { letter: 'D', text: 'd' }];
+  assert.equal(matchChoice(sub, 'above the made-up BP for H O at 1 atm.').letter, 'B');
+  const trials = [{ letter: 'A', text: 'Trial 2' }, { letter: 'B', text: 'Trial 4' }, { letter: 'C', text: 'Trial 6' }, { letter: 'D', text: 'Trial 8' }];
+  assert.equal(matchChoice(trials, 'Trial 6').letter, 'C');
+  assert.equal(matchChoice(trials, 'Trial 5'), null);
+});

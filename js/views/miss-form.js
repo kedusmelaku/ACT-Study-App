@@ -235,7 +235,11 @@ export function render(el, ctx) {
     submitLabel: existing ? 'Save changes' : 'Add to log',
     onSubmit: async (values) => {
       if (existing) {
-        await store.updateMiss({ ...existing, ...values, sourceId: values.sourceId === 'other' ? null : values.sourceId });
+        const next = { ...existing, ...values, sourceId: values.sourceId === 'other' ? null : values.sourceId };
+        // A changed letter makes the saved choice text stale.
+        if (values.myAnswer !== existing.myAnswer) next.myAnswerText = '';
+        if (values.correctAnswer !== existing.correctAnswer) next.correctAnswerText = '';
+        await store.updateMiss(next);
         toast('Saved.');
       } else {
         await store.addMiss({ ...values, sourceId: values.sourceId === 'other' ? null : values.sourceId });

@@ -1,5 +1,5 @@
 // Service worker: offline app shell. Bump CACHE_VERSION whenever a static file changes.
-const CACHE_VERSION = 'v26';
+const CACHE_VERSION = 'v27';
 const CACHE_NAME = `act-prep-${CACHE_VERSION}`;
 
 const ASSETS = [

@@ -313,7 +313,10 @@ function cleanMiss(m) {
     topic: m.topic || '',
     cause: m.cause || 'content',
     myAnswer: m.myAnswer || '',
+    // The text of the chosen and correct choices (from the results page or the attached booklet).
+    myAnswerText: String(m.myAnswerText || '').slice(0, 300),
     correctAnswer: m.correctAnswer || '',
+    correctAnswerText: String(m.correctAnswerText || '').slice(0, 300),
     note: m.note || '',
     fixLine: m.fixLine || '',
     guessedRight: !!m.guessedRight,

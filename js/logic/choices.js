@@ -32,9 +32,21 @@ export function parseChoices(text, q) {
 /** Which choice an answer string matches (answers from the results page are the choice's text). */
 export function matchChoice(choices, answer) {
   if (!choices || !answer) return null;
-  const norm = (s) => String(s).toLowerCase().replace(/\.\.\.$/, '').replace(/[^a-z0-9]/g, '');
+  // NFKC turns math italic letters (𝑎) into plain ones.
+  const norm = (str) => String(str).normalize('NFKC').toLowerCase().replace(/\.\.\.$/, '').replace(/[^a-z0-9]/g, '');
   const a = norm(answer);
   if (!a) return null;
   if (/^[a-dfghj]$/.test(a)) return choices.find((c) => c.letter === TO_AD[a.toUpperCase()]) || null;
-  return choices.find((c) => norm(c.text) === a) || choices.find((c) => norm(c.text).startsWith(a) || a.startsWith(norm(c.text))) || null;
+  const exact = choices.find((c) => norm(c.text) === a) || choices.find((c) => norm(c.text).startsWith(a) || a.startsWith(norm(c.text)));
+  if (exact) return exact;
+  // Subscripts and superscripts land in different places in the two files (H2O read as "H O ... 2").
+  // Compare letters only, and accept it only when exactly one choice fits.
+  const letters = (str) => norm(str).replace(/[0-9]/g, '');
+  const la = letters(answer);
+  if (la.length < 3) return null;
+  const hits = choices.filter((c) => {
+    const lc = letters(c.text);
+    return lc === la || lc.startsWith(la) || la.startsWith(lc);
+  });
+  return hits.length === 1 ? hits[0] : null;
 }
